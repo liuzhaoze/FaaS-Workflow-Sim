@@ -1,0 +1,54 @@
+memory_bandwidth: 100000000000
+numa_bandwidth: 50000000000
+network_bandwidth: 10000000000
+single_core_speed: 1000000000
+
+servers:
+- name: c5.large
+  count: 1
+  hourly_rate: 0.085
+  cold_start_latency: 0.5
+  numa_nodes:
+    count: 1
+    cpu: 2
+    memory: 4096
+- name: c5.xlarge
+  count: 1
+  hourly_rate: 0.17
+  cold_start_latency: 0.6
+  numa_nodes:
+    count: 1
+    cpu: 4
+    memory: 8192
+- name: c5.2xlarge
+  count: 1
+  hourly_rate: 0.34
+  cold_start_latency: 0.8
+  numa_nodes:
+    count: 2
+    cpu: 4
+    memory: 8192
+- name: c5.4xlarge
+  count: 1
+  hourly_rate: 0.68
+  cold_start_latency: 1.0
+  numa_nodes:
+    count: 4
+    cpu: 4
+    memory: 8192
+- name: c5.9xlarge
+  count: 1
+  hourly_rate: 1.53
+  cold_start_latency: 1.5
+  numa_nodes:
+    count: 9
+    cpu: 4
+    memory: 8192
+- name: c5.12xlarge
+  count: 1
+  hourly_rate: 2.04
+  cold_start_latency: 2.0
+  numa_nodes:
+    count: 12
+    cpu: 4
+    memory: 8192
