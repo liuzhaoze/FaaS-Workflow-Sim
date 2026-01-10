@@ -8,6 +8,8 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = [
+    "pydantic>=2.12.5",
+    "pyyaml>=6.0.3",
     "rustworkx>=0.17.1",
 ]
 
