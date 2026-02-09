@@ -52,3 +52,19 @@ servers:
     count: 12
     cpu: 4
     memory: 8192
+- name: c5.18xlarge
+  count: 1
+  hourly_rate: 3.06
+  cold_start_latency: 3.0
+  numa_nodes:
+    count: 18
+    cpu: 4
+    memory: 8192
+- name: c5.24xlarge
+  count: 1
+  hourly_rate: 4.08
+  cold_start_latency: 4.0
+  numa_nodes:
+    count: 24
+    cpu: 4
+    memory: 8192

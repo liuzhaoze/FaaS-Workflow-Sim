@@ -195,10 +195,7 @@ class TestClusterConfigYamlLoading:
 
     def test_load_from_yaml(self, config_file_path: Path):
         """测试从 YAML 文件加载配置"""
-        with open(config_file_path, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-
-        config = ClusterConfig(**data)
+        config = ClusterConfig.from_yaml(str(config_file_path))
 
         # 验证集群级别配置
         assert config.memory_bandwidth == 100000000000
@@ -207,7 +204,7 @@ class TestClusterConfigYamlLoading:
         assert config.single_core_speed == 1000000000
 
         # 验证服务器配置
-        assert len(config.servers) == 6
+        assert len(config.servers) == 8
 
         # 验证 c5.large 服务器
         c5_large = next(s for s in config.servers if s.name == "c5.large")
@@ -263,6 +260,24 @@ class TestClusterConfigYamlLoading:
         assert c5_12xlarge.numa_nodes.cpu == 4
         assert c5_12xlarge.numa_nodes.memory == 8192
 
+        # 验证 c5.18xlarge 服务器
+        c5_18xlarge = next(s for s in config.servers if s.name == "c5.18xlarge")
+        assert c5_18xlarge.count == 1
+        assert c5_18xlarge.hourly_rate == 3.06
+        assert c5_18xlarge.cold_start_latency == 3.0
+        assert c5_18xlarge.numa_nodes.count == 18
+        assert c5_18xlarge.numa_nodes.cpu == 4
+        assert c5_18xlarge.numa_nodes.memory == 8192
+
+        # 验证 c5.24xlarge 服务器
+        c5_24xlarge = next(s for s in config.servers if s.name == "c5.24xlarge")
+        assert c5_24xlarge.count == 1
+        assert c5_24xlarge.hourly_rate == 4.08
+        assert c5_24xlarge.cold_start_latency == 4.0
+        assert c5_24xlarge.numa_nodes.count == 24
+        assert c5_24xlarge.numa_nodes.cpu == 4
+        assert c5_24xlarge.numa_nodes.memory == 8192
+
     def test_yaml_file_exists(self, config_file_path: Path):
         """测试 YAML 配置文件是否存在"""
         assert config_file_path.exists()
@@ -295,29 +310,6 @@ class TestClusterConfigYamlLoading:
             assert "count" in numa
             assert "cpu" in numa
             assert "memory" in numa
-
-    def test_from_yaml_class_method(self, config_file_path: Path):
-        """测试 ClusterConfig.from_yaml() 类方法"""
-        # 使用 from_yaml 类方法加载配置
-        config = ClusterConfig.from_yaml(str(config_file_path))
-
-        # 验证集群级别配置
-        assert config.memory_bandwidth == 100000000000
-        assert config.numa_bandwidth == 50000000000
-        assert config.network_bandwidth == 10000000000
-        assert config.single_core_speed == 1000000000
-
-        # 验证服务器配置
-        assert len(config.servers) == 6
-
-        # 验证各个服务器
-        c5_large = next(s for s in config.servers if s.name == "c5.large")
-        assert c5_large.count == 1
-        assert c5_large.hourly_rate == 0.085
-        assert c5_large.cold_start_latency == 0.5
-        assert c5_large.numa_nodes.count == 1
-        assert c5_large.numa_nodes.cpu == 2
-        assert c5_large.numa_nodes.memory == 4096
 
     def test_from_yaml_file_not_found(self, tmp_path: Path):
         """测试 from_yaml 方法处理文件不存在的情况"""
