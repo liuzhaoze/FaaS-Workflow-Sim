@@ -184,6 +184,107 @@ class TestClusterConfig:
                 servers=servers,
             )
 
+    def test_server_count_can_be_zero(self):
+        """测试服务器类型的数量可以为 0（表示没有该类型的服务器）"""
+        servers = [
+            ServerConfig(
+                name="large",
+                count=2,
+                hourly_rate=0.5,
+                cold_start_latency=1.5,
+                numa_nodes=NumaNodeConfig(count=4, cpu=16, memory=64000),
+            ),
+            ServerConfig(
+                name="medium",
+                count=0,  # 允许为 0
+                hourly_rate=0.3,
+                cold_start_latency=1.0,
+                numa_nodes=NumaNodeConfig(count=2, cpu=8, memory=32000),
+            ),
+        ]
+
+        cluster_config = ClusterConfig(
+            memory_bandwidth=100000000000,
+            numa_bandwidth=50000000000,
+            network_bandwidth=10000000000,
+            single_core_speed=1000000000,
+            servers=servers,
+        )
+
+        assert len(cluster_config.servers) == 2
+        assert cluster_config.servers[0].count == 2
+        assert cluster_config.servers[1].count == 0
+
+    def test_total_server_count_must_be_positive(self):
+        """测试集群中服务器总数必须至少为 1"""
+        servers = [
+            ServerConfig(
+                name="large",
+                count=0,
+                hourly_rate=0.5,
+                cold_start_latency=1.5,
+                numa_nodes=NumaNodeConfig(count=4, cpu=16, memory=64000),
+            ),
+            ServerConfig(
+                name="medium",
+                count=0,
+                hourly_rate=0.3,
+                cold_start_latency=1.0,
+                numa_nodes=NumaNodeConfig(count=2, cpu=8, memory=32000),
+            ),
+        ]
+
+        with pytest.raises(ValidationError) as exc_info:
+            ClusterConfig(
+                memory_bandwidth=100000000000,
+                numa_bandwidth=50000000000,
+                network_bandwidth=10000000000,
+                single_core_speed=1000000000,
+                servers=servers,
+            )
+
+        assert "至少需要有一个服务器" in str(exc_info.value)
+
+    def test_multiple_server_types_with_zero_count(self):
+        """测试多个服务器类型数量为 0，但总数大于 0 的情况"""
+        servers = [
+            ServerConfig(
+                name="large",
+                count=0,
+                hourly_rate=0.5,
+                cold_start_latency=1.5,
+                numa_nodes=NumaNodeConfig(count=4, cpu=16, memory=64000),
+            ),
+            ServerConfig(
+                name="medium",
+                count=0,
+                hourly_rate=0.3,
+                cold_start_latency=1.0,
+                numa_nodes=NumaNodeConfig(count=2, cpu=8, memory=32000),
+            ),
+            ServerConfig(
+                name="small",
+                count=5,  # 只有这个类型有服务器
+                hourly_rate=0.1,
+                cold_start_latency=0.5,
+                numa_nodes=NumaNodeConfig(count=1, cpu=4, memory=16000),
+            ),
+        ]
+
+        cluster_config = ClusterConfig(
+            memory_bandwidth=100000000000,
+            numa_bandwidth=50000000000,
+            network_bandwidth=10000000000,
+            single_core_speed=1000000000,
+            servers=servers,
+        )
+
+        # 验证所有服务器类型都被保留
+        assert len(cluster_config.servers) == 3
+        assert cluster_config.servers[0].count == 0
+        assert cluster_config.servers[1].count == 0
+        assert cluster_config.servers[2].count == 5
+
 
 class TestClusterConfigYamlLoading:
     """测试从 YAML 文件加载配置"""

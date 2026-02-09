@@ -15,7 +15,7 @@ class NumaNodeConfig(BaseModel):
 
 class ServerConfig(BaseModel):
     name: str = Field(..., description="服务器类型名称")
-    count: int = Field(..., gt=0, description="服务器数量")
+    count: int = Field(..., ge=0, description="服务器数量")
     hourly_rate: float = Field(..., gt=0, description="每小时租金")
     cold_start_latency: float = Field(..., gt=0, description="冷启动延迟 (秒)")
     numa_nodes: NumaNodeConfig = Field(..., description="NUMA 节点配置")
@@ -43,5 +43,14 @@ class ClusterConfig(BaseModel):
         if len(names) != len(unique_names):
             duplicates = set(n for n in names if names.count(n) > 1)
             raise ValueError(f"服务器配置中存在重复的类型名称: {', '.join(duplicates)}")
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_total_server_count(self) -> "ClusterConfig":
+        total_count = sum(server.count for server in self.servers)
+
+        if total_count <= 0:
+            raise ValueError("服务器配置中至少需要有一个服务器")
 
         return self
