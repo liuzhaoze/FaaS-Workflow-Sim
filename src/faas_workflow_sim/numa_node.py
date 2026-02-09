@@ -79,9 +79,14 @@ class NumaNode:
         """
 
         # 计算容器的创建时间
-        # 当 NUMA 节点所属的服务器冷启动时，容器对应的函数的提交时间早于启动完成后的当前时间
-        # 此时容器创建时间不能以函数提交时间为准，应该是服务器启动完成后的当前时间加上数据传输时间
-        # 虽然 Server.startup_at 方法在一次租赁操作中只返回一次冷启动时间，但是在服务器启动之前提交到该服务器的函数都需要等待冷启动完成才能创建容器
+        # 理论上讲，容器创建之前需要经历服务器冷启动和数据传输两个阶段，但此处计算创建时间时并没有体现冷启动时间
+        # 这是因为 Server.startup_at 方法在处理冷启动时会调用 NumaNode.on_server_startup 方法，将服务器的所有 NUMA 节点的当前时间更新到服务器启动完成后的时间
+        # 这样能够保证所有 NUMA 节点都受到了服务器冷启动的影响
+        # 之所以不使用 creation_time = submission_time + cold_start_time + data_transfer_time 来计算容器创建时间
+        # 是因为后续提交到该服务器的函数虽然不会触发冷启动（即 cold_start_time = 0），但是那些提交时间早于服务器启动完成的函数的容器也应该受到冷启动的影响，在服务器启动之后创建
+        # 而上述计算方法可能会出现 creation_time = submission_time + 0 + data_transfer_time 小于服务器启动完成时间的情况，没有体现冷启动对后续提交到该服务器上的函数的容器的创建时间产生的影响
+        # 因此，只有在服务器冷启动时调用 on_server_startup 方法，将属于该服务器的 NUMA 节点的当前时间更新到服务器启动完成的时间，并使用下面的方法计算容器创建时间
+        # 才能够确保后续提交到该服务器的函数的容器创建都能受到冷启动的影响，保证容器创建时间不会早于服务器启动完成后的时间
         creation_time = max(self._current_time, c.submission_time) + c.data_transfer_time
         c.create(creation_time)
 
