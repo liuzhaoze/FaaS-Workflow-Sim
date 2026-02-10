@@ -88,6 +88,8 @@ class NumaNode:
         # 因此，只有在服务器冷启动时调用 on_server_startup 方法，将属于该服务器的 NUMA 节点的当前时间更新到服务器启动完成的时间，并使用下面的方法计算容器创建时间
         # 才能够确保后续提交到该服务器的函数的容器创建都能受到冷启动的影响，保证容器创建时间不会早于服务器启动完成后的时间
         creation_time = max(self._current_time, c.submission_time) + c.data_transfer_time
+        # 不用担心在 submit_time 和 creation_time 之间出现其他函数完成导致这些函数的后继函数比当前函数早提交的情况
+        # 因为那些后继函数的提交时间一定比当前函数的提交时间晚，先处理的必然是当前函数
         c.create(creation_time)
 
         r = self._rum.get_record_at(creation_time)
