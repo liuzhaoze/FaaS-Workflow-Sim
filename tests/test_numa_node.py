@@ -1,12 +1,12 @@
 """test_numa_node.py
 
-测试 src/faas_workflow_sim/numa_node.py 中的 NumaNode、ResourceUtilizationManager、ExecutionSpeedManager 和相关辅助类
+测试 src/serverless_workflow_arena/numa_node.py 中的 NumaNode、ResourceUtilizationManager、ExecutionSpeedManager 和相关辅助类
 """
 
 import pytest
 
-from faas_workflow_sim.container import Container
-from faas_workflow_sim.numa_node import (
+from serverless_workflow_arena.container import Container
+from serverless_workflow_arena.numa_node import (
     ExecutionSpeedManager,
     NumaNode,
     ResourceUtilizationManager,

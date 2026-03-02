@@ -1,11 +1,11 @@
 """test_function.py
 
-测试 src/faas_workflow_sim/function.py 中的 Function 类和 FuncStat 枚举
+测试 src/serverless_workflow_arena/function.py 中的 Function 类和 FuncStat 枚举
 """
 
 import pytest
 
-from faas_workflow_sim.function import FuncStat, Function
+from serverless_workflow_arena.function import FuncStat, Function
 
 
 class TestFuncStat:

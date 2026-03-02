@@ -1,6 +1,6 @@
 """test_workflow_template.py
 
-测试 src/faas_workflow_sim/workflow_template.py 中的 WorkflowTemplate 类
+测试 src/serverless_workflow_arena/workflow_template.py 中的 WorkflowTemplate 类
 """
 
 import copy
@@ -11,8 +11,8 @@ from pathlib import Path
 import pytest
 from pytest import FixtureRequest
 
-from faas_workflow_sim.tools.dax_parser import DagInfo
-from faas_workflow_sim.workflow_template import WorkflowTemplate
+from serverless_workflow_arena.tools.dax_parser import DagInfo
+from serverless_workflow_arena.workflow_template import WorkflowTemplate
 
 
 class TestWorkflowTemplate:

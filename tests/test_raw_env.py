@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from faas_workflow_sim import ClusterConfig, RawEnv, WorkflowTemplate
+from serverless_workflow_arena import ClusterConfig, RawEnv, WorkflowTemplate
 
 DATA_DIR = Path(__file__).parent / "data"
 

@@ -1,6 +1,6 @@
 """test_dax_parser.py
 
-测试 src/faas_workflow_sim/tools/dax_parser.py 中的函数
+测试 src/serverless_workflow_arena/tools/dax_parser.py 中的函数
 """
 
 import json
@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pytest import FixtureRequest
 
-from faas_workflow_sim.tools.dax_parser import JobInfo, calculate_data_transfer_size, parse_dax
+from serverless_workflow_arena.tools.dax_parser import JobInfo, calculate_data_transfer_size, parse_dax
 
 
 class TestCalculateDataTransferSize:

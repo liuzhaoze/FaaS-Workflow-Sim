@@ -1,13 +1,13 @@
 """test_pretty_json.py
 
-测试 src/faas_workflow_sim/tools/pretty_json.py 中的函数
+测试 src/serverless_workflow_arena/tools/pretty_json.py 中的函数
 """
 
 import tempfile
 from pathlib import Path
 
-from faas_workflow_sim.tools.dax_parser import EdgeInfo, NodeInfo
-from faas_workflow_sim.tools.pretty_json import pretty_json_dump
+from serverless_workflow_arena.tools.dax_parser import EdgeInfo, NodeInfo
+from serverless_workflow_arena.tools.pretty_json import pretty_json_dump
 
 
 class TestPrettyJsonDump:

@@ -6,7 +6,7 @@ sys.path.append(str(PROJECT_ROOT))
 
 import time
 
-from faas_workflow_sim import ClusterConfig, RawEnv, WorkflowTemplate
+from serverless_workflow_arena import ClusterConfig, RawEnv, WorkflowTemplate
 
 # 数据和配置文件路径
 dax_files = tuple((PROJECT_ROOT / "tests" / "data").glob("*.dax"))
@@ -19,12 +19,15 @@ cluster_config = ClusterConfig.from_yaml(str(config_file))
 arrival_times = [float(i) for i in range(5)]
 workflow_templates = [WorkflowTemplate(str(f), cluster_config.single_core_speed) for f in dax_files]
 
-# 合法的资源分配策略
-valid_strategies: list[tuple[str, int, int]] = []
+# 内存大小选项
+memory_options = [128, 256, 512, 1024]
+
+# NUMA 节点选项
+numa_options: list[tuple[str, int, int]] = []
 for server_config in cluster_config.servers:
     for server_id in range(server_config.count):
         for numa_node_id in range(server_config.numa_nodes.count):
-            valid_strategies.append((server_config.name, server_id, numa_node_id))
+            numa_options.append((server_config.name, server_id, numa_node_id))
 
 env = RawEnv(arrival_times, workflow_templates, cluster_config)
 env.reset()
@@ -35,10 +38,10 @@ tic = time.time()
 
 while True:
     # 使用 Round-Robin 为函数分配资源
-    server_name, server_id, numa_node_id = valid_strategies[step_count % len(valid_strategies)]
-    allocated_memory = 256
+    server_name, server_id, numa_node_id = numa_options[step_count % len(numa_options)]
+    memory = memory_options[step_count % len(memory_options)]
 
-    env_log = env.step(server_name, server_id, numa_node_id, allocated_memory)
+    env_log = env.step(server_name, server_id, numa_node_id, memory)
 
     print(
         "Step {}: Allocate({}, {}) -> ({}, {}, {}); Finished: [{}]".format(

@@ -1,11 +1,11 @@
 {
     "python.analysis.typeCheckingMode": "strict",
     "cSpell.words": [
-        "faas",
         "funcs",
-        "Numa",
+        "numa",
         "pycache",
         "reqs",
-        "succ"
+        "succ",
+        "xlarge"
     ],
 }

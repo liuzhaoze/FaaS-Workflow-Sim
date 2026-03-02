@@ -1,6 +1,6 @@
 """test_cluster.py
 
-测试 src/faas_workflow_sim/cluster.py 中的 Cluster 类
+测试 src/serverless_workflow_arena/cluster.py 中的 Cluster 类
 """
 
 from pathlib import Path
@@ -8,9 +8,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-from faas_workflow_sim.cluster import Cluster
-from faas_workflow_sim.config import ClusterConfig
-from faas_workflow_sim.container import Container
+from serverless_workflow_arena.cluster import Cluster
+from serverless_workflow_arena.config import ClusterConfig
+from serverless_workflow_arena.container import Container
 
 
 @pytest.fixture

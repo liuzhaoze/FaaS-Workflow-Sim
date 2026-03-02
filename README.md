@@ -1,4 +1,4 @@
-# Serverless 强化学习环境
+# Serverless Workflow 强化学习环境
 
 本强化学习环境包含 `Function`、`Workflow`、`Workload`、`NumaNode`、`Server`、`Cluster` 共六个实体，模拟了 serverless 工作流在异构 NUMA 集群中的执行过程。
 

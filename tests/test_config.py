@@ -1,6 +1,6 @@
 """test_config.py
 
-测试 src/faas_workflow_sim/config.py 中的集群配置类
+测试 src/serverless_workflow_arena/config.py 中的集群配置类
 """
 
 from pathlib import Path
@@ -9,7 +9,7 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from faas_workflow_sim.config import ClusterConfig, NumaNodeConfig, ServerConfig
+from serverless_workflow_arena.config import ClusterConfig, NumaNodeConfig, ServerConfig
 
 
 class TestClusterConfig:

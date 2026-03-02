@@ -1,11 +1,11 @@
 """test_container.py
 
-测试 src/faas_workflow_sim/container.py 中的 Container 类
+测试 src/serverless_workflow_arena/container.py 中的 Container 类
 """
 
 import pytest
 
-from faas_workflow_sim.container import Container
+from serverless_workflow_arena.container import Container
 
 
 class TestContainer:

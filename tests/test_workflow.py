@@ -1,6 +1,6 @@
 """test_workflow.py
 
-测试 src/faas_workflow_sim/workflow.py 中的 Workflow 类和 SubmittableFunc 类
+测试 src/serverless_workflow_arena/workflow.py 中的 Workflow 类和 SubmittableFunc 类
 """
 
 from pathlib import Path
@@ -9,9 +9,9 @@ import pytest
 import rustworkx as rx
 from pytest import FixtureRequest
 
-from faas_workflow_sim.function import FuncStat
-from faas_workflow_sim.workflow import SubmittableFunc, Workflow
-from faas_workflow_sim.workflow_template import WorkflowTemplate
+from serverless_workflow_arena.function import FuncStat
+from serverless_workflow_arena.workflow import SubmittableFunc, Workflow
+from serverless_workflow_arena.workflow_template import WorkflowTemplate
 
 
 class TestSubmittableFunc:

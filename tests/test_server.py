@@ -1,14 +1,14 @@
 """test_server.py
 
-测试 src/faas_workflow_sim/server.py 中的 Server 类
+测试 src/serverless_workflow_arena/server.py 中的 Server 类
 """
 
 import math
 
 import pytest
 
-from faas_workflow_sim.container import Container
-from faas_workflow_sim.server import HOUR, Server
+from serverless_workflow_arena.container import Container
+from serverless_workflow_arena.server import HOUR, Server
 
 
 class TestServerInit:

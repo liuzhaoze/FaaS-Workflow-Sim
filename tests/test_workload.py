@@ -1,6 +1,6 @@
 """test_workload.py
 
-测试 src/faas_workflow_sim/workload.py 中的 Workload 类和 SubmittedFunc 类
+测试 src/serverless_workflow_arena/workload.py 中的 Workload 类和 SubmittedFunc 类
 """
 
 from pathlib import Path
@@ -9,9 +9,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from faas_workflow_sim.function import FuncStat
-from faas_workflow_sim.workflow_template import WorkflowTemplate
-from faas_workflow_sim.workload import SubmittedFunc, Workload
+from serverless_workflow_arena.function import FuncStat
+from serverless_workflow_arena.workflow_template import WorkflowTemplate
+from serverless_workflow_arena.workload import SubmittedFunc, Workload
 
 
 class TestSubmittedFunc:
