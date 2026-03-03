@@ -7,7 +7,7 @@ sys.path.append(str(PROJECT_ROOT))
 import time
 
 import numpy as np
-from utils import get_standard_cp_length, get_standard_data_transfer_time
+from utils import get_standard_cp_length, get_standard_data_transfer_time, log_squash
 
 from serverless_workflow_arena import ClusterConfig, RawEnv, WorkflowTemplate
 from serverless_workflow_arena.location import Location
@@ -41,6 +41,7 @@ MAX_CPU = max(srv.numa_nodes.cpu for srv in cluster_config.servers)
 MAX_MEM_OPT = max(memory_options)
 MAX_QUEUED_FUNCTIONS = 1  # 在工作负载执行过程中，提交队列中函数的最大数量
 MAX_ACTIVE_WORKFLOWS = 1  # 在工作负载执行过程中，已到达但尚未完成的工作流的最大数量
+HOUR_IN_SECONDS = 3600
 
 # 预先计算状态/观测空间需要的变量
 # 工作流的到达时间
@@ -113,6 +114,24 @@ while True:
             )
         ndarray /= standard_data_transfer_times[wf_id, fn_id]
     print("将当前函数分配到每个NUMA节点的预计归一化数据传输时间：", norm_data_transfer_times)
+
+    cluster_status = env.cluster.get_status_at(submission_time)
+
+    # 服务器级特征
+    server_features = {
+        name: np.array(
+            [
+                [
+                    server_status.remaining_lease_time / HOUR_IN_SECONDS,
+                    log_squash(server_status.time_to_first_completion),
+                    log_squash(server_status.time_to_last_completion),
+                ]
+                for server_status in server_statuses
+            ]
+        )
+        for name, server_statuses in cluster_status.items()
+    }
+    print("服务器级特征（剩余租期，下一个函数完成需要的时间，所有函数完成需要的时间）：", server_features)
 
     # 使用 Round-Robin 为函数分配资源
     server_name, server_id, numa_node_id = numa_options[step_count % len(numa_options)]

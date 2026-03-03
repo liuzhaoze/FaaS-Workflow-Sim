@@ -56,3 +56,9 @@ def get_standard_data_transfer_time(dag: rx.PyDiGraph, data_transfer_speed: int)
         result[node] = total_data_size / data_transfer_speed
 
     return result
+
+
+def log_squash(x: float, c: float = 1.0) -> float:
+    """对输入值进行 Log-Squashing Normalization，将其压缩到 (0, 1) 范围内"""
+    y = np.log1p(x)
+    return y / (c + y)
