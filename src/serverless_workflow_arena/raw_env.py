@@ -141,3 +141,19 @@ class RawEnv:
     def active_workflow_count(self) -> int:
         """当前已到达但尚未完成的工作流数量"""
         return len(self._active_workflows)
+
+    def get_data_distribution(self, wf_id: int, fn_id: int) -> list[tuple[Location, int]]:
+        """获取指定函数的前驱函数数据在集群中的分布
+
+        Args:
+            wf_id (int): 工作流ID
+            fn_id (int): 函数ID
+
+        Returns:
+            list[tuple[Location, int]]: 列表中的元素为前驱函数数据所在的 NUMA 节点位置和数据大小的二元组
+        """
+
+        return [
+            (self._location_records[(wf_id, pred_fn_id)], data_size)
+            for pred_fn_id, _, data_size in self.workload[wf_id].get_predecessor_functions(fn_id)
+        ]
