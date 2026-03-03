@@ -133,6 +133,19 @@ while True:
     }
     print("服务器级特征（剩余租期，下一个函数完成需要的时间，所有函数完成需要的时间）：", server_features)
 
+    # NUMA 节点级特征
+    numa_node_features = {
+        name: np.array(
+            [
+                [nn_status.cpu, nn_status.memory, nn_status.load]
+                for server_status in server_statuses
+                for nn_status in server_status.numa_node_statuses
+            ]
+        )
+        for name, server_statuses in cluster_status.items()
+    }
+    print("NUMA节点级特征（CPU利用率，内存利用率，负载水平）：", numa_node_features)
+
     # 使用 Round-Robin 为函数分配资源
     server_name, server_id, numa_node_id = numa_options[step_count % len(numa_options)]
     memory = memory_options[step_count % len(memory_options)]
