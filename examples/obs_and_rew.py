@@ -38,6 +38,7 @@ env.reset()
 # 归一化所需变量
 MAX_CPU = max(srv.numa_nodes.cpu for srv in cluster_config.servers)
 MAX_MEM_OPT = max(memory_options)
+MAX_QUEUED_FUNCTIONS = 1  # 在工作负载执行过程中，提交队列中函数的最大数量
 
 # 预先计算状态/观测空间需要的变量
 # 工作流的到达时间
@@ -94,6 +95,9 @@ while True:
     print("函数的内存需求是否超过最大内存选项：", norm_memory_reqs[wf_id, fn_id] > 1.0)
     print("满足函数内存需求的归一化最低内存选项索引：", norm_lowest_feasible_memory_tiers[wf_id, fn_id])
     print("从当前函数节点出发的归一化标准关键路径长度：", norm_standard_critical_path_lengths[wf_id, fn_id])
+
+    # 工作负载相关特征
+    print("归一化提交队列长度：", env.submit_queue_length / MAX_QUEUED_FUNCTIONS)
 
     # 使用 Round-Robin 为函数分配资源
     server_name, server_id, numa_node_id = numa_options[step_count % len(numa_options)]

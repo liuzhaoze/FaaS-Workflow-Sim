@@ -120,3 +120,8 @@ class RawEnv:
             rent=rent,
             terminated=self.workload.completed,
         )
+
+    @property
+    def submit_queue_length(self) -> int:
+        """当前提交队列长度"""
+        return self.workload.submit_queue.qsize()
