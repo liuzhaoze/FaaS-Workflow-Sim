@@ -77,6 +77,24 @@ step_count = 0
 tic = time.time()
 
 while True:
+    if env.current_function is None:
+        raise RuntimeError("No function to schedule. The environment may have terminated.")
+
+    submission_time, wf_id, fn_id = env.current_function
+
+    # 工作流和函数相关特征
+    workflow_elapsed_time = submission_time - arrival_times[wf_id]
+    print(
+        "当前函数所属工作流的归一化已执行时间：",
+        workflow_elapsed_time / (workflow_elapsed_time + standard_makespans[wf_id, 0]),
+    )
+    print("函数的归一化标准执行时间：", norm_standard_execution_times[wf_id, fn_id])
+    print("函数的归一化并行度：", norm_parallelisms[wf_id, fn_id])
+    print("函数的归一化内存需求：", min(norm_memory_reqs[wf_id, fn_id], 1.0))
+    print("函数的内存需求是否超过最大内存选项：", norm_memory_reqs[wf_id, fn_id] > 1.0)
+    print("满足函数内存需求的归一化最低内存选项索引：", norm_lowest_feasible_memory_tiers[wf_id, fn_id])
+    print("从当前函数节点出发的归一化标准关键路径长度：", norm_standard_critical_path_lengths[wf_id, fn_id])
+
     # 使用 Round-Robin 为函数分配资源
     server_name, server_id, numa_node_id = numa_options[step_count % len(numa_options)]
     memory = memory_options[step_count % len(memory_options)]
