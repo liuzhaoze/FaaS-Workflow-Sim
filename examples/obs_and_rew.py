@@ -10,6 +10,7 @@ import numpy as np
 from utils import get_standard_cp_length, get_standard_data_transfer_time
 
 from serverless_workflow_arena import ClusterConfig, RawEnv, WorkflowTemplate
+from serverless_workflow_arena.location import Location
 
 # 数据和配置文件路径
 dax_files = tuple((PROJECT_ROOT / "tests" / "data").glob("*.dax"))
@@ -100,6 +101,18 @@ while True:
     # 工作负载相关特征
     print("归一化提交队列长度：", env.submit_queue_length / MAX_QUEUED_FUNCTIONS)
     print("归一化已到达但尚未完成的工作流数量：", env.active_workflow_count / MAX_ACTIVE_WORKFLOWS)
+
+    # 数据传输相关特征
+    data_distribution = env.get_data_distribution(wf_id, fn_id)
+    norm_data_transfer_times = {srv.name: np.zeros((srv.count, srv.numa_nodes.count)) for srv in cluster_config.servers}
+    for name, ndarray in norm_data_transfer_times.items():
+        for idx in np.ndindex(ndarray.shape):
+            ndarray[idx] = sum(
+                (size / env.cluster.get_data_transfer_speed(loc, Location(name, *idx)))
+                for loc, size in data_distribution
+            )
+        ndarray /= standard_data_transfer_times[wf_id, fn_id]
+    print("将当前函数分配到每个NUMA节点的预计归一化数据传输时间：", norm_data_transfer_times)
 
     # 使用 Round-Robin 为函数分配资源
     server_name, server_id, numa_node_id = numa_options[step_count % len(numa_options)]

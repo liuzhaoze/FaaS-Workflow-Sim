@@ -4,6 +4,7 @@
         "funcs",
         "keepdims",
         "makespans",
+        "ndindex",
         "numa",
         "pycache",
         "reqs",
