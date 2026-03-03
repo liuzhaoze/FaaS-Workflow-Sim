@@ -29,6 +29,7 @@ class RawEnv:
 
         self.current_function: SubmittedFunc | None = None
         self._location_records: dict[tuple[int, int], Location] = {}
+        self._active_workflows: set[int] = set()
 
     def reset(self):
         """重置无服务器计算环境"""
@@ -36,7 +37,12 @@ class RawEnv:
         self.cluster.reset()
 
         self.current_function = self.workload.get()
+        if self.current_function is None:
+            raise RuntimeError("Environment reset failed: no functions in the workload.")
+
         self._location_records.clear()
+        self._active_workflows.clear()
+        self._active_workflows.add(self.current_function.wf_id)
 
     def step(self, server_name: str, server_id: int, numa_node_id: int, allocated_memory: int) -> EnvLog:
         """无服务器计算状态转移逻辑
@@ -101,7 +107,12 @@ class RawEnv:
                 FunctionExecutionRecord(c.wf_id, c.fn_id, c.start_time, c.completion_time)
             )
 
+            if self.workload[c.wf_id].completed:
+                self._active_workflows.remove(c.wf_id)
+
         self.current_function = self.workload.get()
+        if self.current_function is not None:
+            self._active_workflows.add(self.current_function.wf_id)
 
         # 返回本次步骤的环境日志
         return EnvLog(
@@ -125,3 +136,8 @@ class RawEnv:
     def submit_queue_length(self) -> int:
         """当前提交队列长度"""
         return self.workload.submit_queue.qsize()
+
+    @property
+    def active_workflow_count(self) -> int:
+        """当前已到达但尚未完成的工作流数量"""
+        return len(self._active_workflows)

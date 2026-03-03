@@ -39,6 +39,7 @@ env.reset()
 MAX_CPU = max(srv.numa_nodes.cpu for srv in cluster_config.servers)
 MAX_MEM_OPT = max(memory_options)
 MAX_QUEUED_FUNCTIONS = 1  # 在工作负载执行过程中，提交队列中函数的最大数量
+MAX_ACTIVE_WORKFLOWS = 1  # 在工作负载执行过程中，已到达但尚未完成的工作流的最大数量
 
 # 预先计算状态/观测空间需要的变量
 # 工作流的到达时间
@@ -98,6 +99,7 @@ while True:
 
     # 工作负载相关特征
     print("归一化提交队列长度：", env.submit_queue_length / MAX_QUEUED_FUNCTIONS)
+    print("归一化已到达但尚未完成的工作流数量：", env.active_workflow_count / MAX_ACTIVE_WORKFLOWS)
 
     # 使用 Round-Robin 为函数分配资源
     server_name, server_id, numa_node_id = numa_options[step_count % len(numa_options)]
