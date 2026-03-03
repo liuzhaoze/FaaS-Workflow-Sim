@@ -39,7 +39,7 @@ class Workflow:
         "wf_id",
         "arrival_time",
         "_functions",
-        "_dag",
+        "dag",
         "source_functions",
         "pending_functions",
         "submitted_functions",
@@ -73,12 +73,12 @@ class Workflow:
             for fn_id, (comp, mem, par) in enumerate(zip(computations, memory_reqs, parallelisms))
         ]
 
-        self._dag: rx.PyDiGraph = rx.PyDiGraph()
+        self.dag: rx.PyDiGraph = rx.PyDiGraph()
         n_nodes = len(self._functions)
-        self._dag.add_nodes_from(range(n_nodes))
-        self._dag.add_edges_from(edges)
+        self.dag.add_nodes_from(range(n_nodes))
+        self.dag.add_edges_from(edges)
 
-        self.source_functions = set(rx.topological_generations(self._dag)[0])
+        self.source_functions = set(rx.topological_generations(self.dag)[0])
 
         # 处于不同状态的函数的集合
         self.pending_functions: set[int] = set()
@@ -100,7 +100,7 @@ class Workflow:
         for fn in self._functions:
             fn.reset()
 
-        self.pending_functions = set(self._dag.node_indices())
+        self.pending_functions = set(self.dag.node_indices())
         self.submitted_functions.clear()
         self.running_functions.clear()
         self.finished_functions.clear()
@@ -140,12 +140,12 @@ class Workflow:
         """
 
         result: list[SubmittableFunc] = []
-        successors = set(self._dag.successor_indices(fn_id))
+        successors = set(self.dag.successor_indices(fn_id))
 
         # 如果一个函数刚刚完成，那么它的后继函数一定是 PENDING 状态
         for succ in successors:
             # 获取 fn_id 后继函数 succ 的所有前驱函数
-            predecessors = set(self._dag.predecessor_indices(succ))
+            predecessors = set(self.dag.predecessor_indices(succ))
             # 检查所有前驱函数是否都已完成
             if not predecessors.issubset(self.finished_functions):
                 continue
@@ -166,7 +166,7 @@ class Workflow:
             WeightedEdgeList: 元组列表，格式为 (源函数ID, 目标函数ID, 传输数据大小)
         """
 
-        return self._dag.in_edges(fn_id)
+        return self.dag.in_edges(fn_id)
 
     @property
     def completed(self) -> bool:

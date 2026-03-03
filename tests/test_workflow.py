@@ -130,7 +130,7 @@ class TestWorkflow:
             "wf_id",
             "arrival_time",
             "_functions",
-            "_dag",
+            "dag",
             "source_functions",
             "pending_functions",
             "submitted_functions",
@@ -404,7 +404,7 @@ class TestWorkflow:
         workflow = workflow_from_template
 
         # 验证图结构基本有效性
-        assert hasattr(workflow, "_dag")
+        assert hasattr(workflow, "dag")
         assert len(workflow) > 0
 
         # 验证函数数据有效性

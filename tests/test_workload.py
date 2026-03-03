@@ -291,9 +291,9 @@ class TestWorkload:
 
             # 检查是否有新的函数被添加到队列
             # 如果后继函数只有这一个前驱，那么它应该被添加到队列
-            successors = workflow._dag.successor_indices(func.fn_id)  # type: ignore
+            successors = workflow.dag.successor_indices(func.fn_id)
             for succ in successors:
-                predecessors = workflow._dag.predecessor_indices(succ)  # type: ignore
+                predecessors = workflow.dag.predecessor_indices(succ)
                 if set(predecessors) <= {func.fn_id}:  # 所有前驱都已完成
                     # 应该有新函数被添加
                     assert workload._submit_queue.qsize() >= initial_queue_size  # type: ignore
@@ -310,7 +310,7 @@ class TestWorkload:
         for i in range(len(arrival_times)):
             wf = workload[i]
             for fn_id in range(len(wf)):
-                successors = wf._dag.successor_indices(fn_id)  # type: ignore
+                successors = wf.dag.successor_indices(fn_id)
                 if not successors:  # 没有后继
                     # 需要先提交这个函数
                     wf.submit_function(fn_id, wf.arrival_time)
@@ -590,7 +590,7 @@ class TestWorkload:
                 fn_completion_time = wf[fn_id].completion_time
 
                 # 检查所有后继函数
-                successors = wf._dag.successor_indices(fn_id)  # type: ignore
+                successors = wf.dag.successor_indices(fn_id)
                 for succ_id in successors:
                     succ_start_time = wf[succ_id].start_time
                     assert (

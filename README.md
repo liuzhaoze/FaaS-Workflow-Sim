@@ -38,7 +38,7 @@
 - `wf_id`: 工作流的 ID
 - `arrival_time`: 工作流执行请求到达的时间
 - `_functions`: 储存了工作流中所有函数实例
-- `_dag`: 储存了工作流的 DAG 结构
+- `dag`: 储存了工作流的 DAG 结构
 - `source_functions`: 工作流中的源点函数集合
 - `pending_functions`: 工作流中处于 `PENDING` 状态的函数集合
 - `submitted_functions`: 工作流中处于 `SUBMITTED` 状态的函数集合
