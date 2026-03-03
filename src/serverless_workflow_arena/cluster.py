@@ -6,7 +6,7 @@
 from .config import ClusterConfig
 from .container import Container
 from .location import Location
-from .server import Server
+from .server import Server, ServerStatus
 
 
 class Cluster:
@@ -184,3 +184,15 @@ class Cluster:
             return self.numa_bandwidth
 
         return self.memory_bandwidth
+
+    def get_status_at(self, time: float) -> dict[str, tuple[ServerStatus, ...]]:
+        """获得集群中所有服务器在指定时间点的状态
+
+        Args:
+            time (float): 时间点
+
+        Returns:
+            dict[str, tuple[ServerStatus, ...]]: 集群中所有服务器的状态，键为服务器类型名称，值为对应服务器类型的所有服务器的状态组成的元组
+        """
+
+        return {name: tuple(s.get_status_at(time) for s in servers) for name, servers in self._servers.items()}
