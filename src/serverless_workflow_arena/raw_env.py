@@ -6,7 +6,7 @@
 from .cluster import Cluster
 from .config import ClusterConfig
 from .container import Container
-from .env_log import EnvLog, FunctionExecutionRecord
+from .env_log import EnvLog, FunctionExecutionRecord, WorkflowExecutionRecord
 from .location import Location
 from .workflow_template import WorkflowTemplate
 from .workload import SubmittedFunc, Workload
@@ -95,6 +95,7 @@ class RawEnv:
 
         # 获取下一个函数
         function_execution_records: list[FunctionExecutionRecord] = []
+        workflow_execution_records: list[WorkflowExecutionRecord] = []
 
         while (not self.workload.completed) and (
             self.workload.peek() is None or self.cluster.earliest_finished_time <= self.workload.peek().submission_time  # type: ignore
@@ -109,6 +110,7 @@ class RawEnv:
 
             if self.workload[c.wf_id].completed:
                 self._active_workflows.remove(c.wf_id)
+                workflow_execution_records.append(WorkflowExecutionRecord(c.wf_id, c.completion_time))
 
         self.current_function = self.workload.get()
         if self.current_function is not None:
@@ -128,6 +130,7 @@ class RawEnv:
             cold_start_time=cold_start_time,
             data_transfer_time=data_transfer_time,
             finished_function_records=function_execution_records,
+            finished_workflow_records=workflow_execution_records,
             rent=rent,
             terminated=self.workload.completed,
         )

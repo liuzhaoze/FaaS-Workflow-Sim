@@ -22,6 +22,18 @@ class FunctionExecutionRecord(NamedTuple):
     completion_time: float
 
 
+class WorkflowExecutionRecord(NamedTuple):
+    """记录工作流执行结束的时间
+
+    Attributes:
+        wf_id (int): 工作流ID
+        completion_time (float): 工作流执行完成的时间
+    """
+
+    wf_id: int
+    completion_time: float
+
+
 class EnvLog(NamedTuple):
     """环境日志记录
 
@@ -54,5 +66,6 @@ class EnvLog(NamedTuple):
     cold_start_time: float
     data_transfer_time: float
     finished_function_records: list[FunctionExecutionRecord]
+    finished_workflow_records: list[WorkflowExecutionRecord]
     rent: float
     terminated: bool
