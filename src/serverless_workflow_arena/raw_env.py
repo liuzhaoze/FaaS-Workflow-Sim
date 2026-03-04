@@ -97,9 +97,12 @@ class RawEnv:
         function_execution_records: list[FunctionExecutionRecord] = []
         workflow_execution_records: list[WorkflowExecutionRecord] = []
 
-        while (not self.workload.completed) and (
-            self.workload.peek() is None or self.cluster.earliest_finished_time <= self.workload.peek().submission_time  # type: ignore
+        candidate_function = self.workload.peek()
+        while (candidate_function and self.cluster.earliest_finished_time <= candidate_function.submission_time) or (
+            (not candidate_function) and (not self.workload.completed)
         ):
+            # 当提交队列存在函数时，应先处理候选函数提交前完成的容器，这些容器完成后触发的后继函数会在候选函数之前提交
+            # 当提交队列为空时，应持续完成容器直到触发新的后继函数提交或直到工作负载完成
             r, c = self.cluster.on_container_completion()
             rent += r
             self.workload.run_function(c.wf_id, c.fn_id, c.start_time)
@@ -111,6 +114,8 @@ class RawEnv:
             if self.workload[c.wf_id].completed:
                 self._active_workflows.remove(c.wf_id)
                 workflow_execution_records.append(WorkflowExecutionRecord(c.wf_id, c.completion_time))
+
+            candidate_function = self.workload.peek()
 
         self.current_function = self.workload.get()
         if self.current_function is not None:
