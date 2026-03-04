@@ -42,6 +42,7 @@ MAX_MEM_OPT = max(memory_options)
 MAX_QUEUED_FUNCTIONS = 1  # 在工作负载执行过程中，提交队列中函数的最大数量
 MAX_ACTIVE_WORKFLOWS = 1  # 在工作负载执行过程中，已到达但尚未完成的工作流的最大数量
 HOUR_IN_SECONDS = 3600
+CFG_DICT = {srv.name: (srv.numa_nodes.cpu, srv.numa_nodes.memory) for srv in cluster_config.servers}
 
 # 预先计算状态/观测空间需要的变量
 # 工作流的到达时间
@@ -146,9 +147,149 @@ while True:
     }
     print("NUMA节点级特征（CPU利用率，内存利用率，负载水平）：", numa_node_features)
 
-    # 使用 Round-Robin 为函数分配资源
-    server_name, server_id, numa_node_id = numa_options[step_count % len(numa_options)]
+    """[多智能体] 全局状态空间需要包括以上所有特征"""
+
+    """[多智能体] 内存分配智能体的观测空间包括以下特征"""
+    # 函数的归一化内存需求
+    # 函数的内存需求是否超过最大内存选项
+    # 满足函数内存需求的归一化最低内存选项索引
+    memory_utilization = {
+        name: np.array(
+            [nn_status.memory for server_status in server_statuses for nn_status in server_status.numa_node_statuses]
+        )
+        for name, server_statuses in cluster_status.items()
+    }
+    print(
+        "各类型服务器的内存利用率统计信息：",
+        {
+            name: np.array([ndarray.min(), ndarray.max(), ndarray.mean()])
+            for name, ndarray in memory_utilization.items()
+        },
+    )
+    free_memory = {
+        name: np.array(
+            [
+                nn_status.free_memory
+                for server_status in server_statuses
+                for nn_status in server_status.numa_node_statuses
+            ]
+        )
+        for name, server_statuses in cluster_status.items()
+    }
+    print(
+        "各类型的所有NUMA节点空闲内存满足各内存选项的比例：",
+        {name: (ndarray[:, None] >= memory_options).mean(axis=0) for name, ndarray in free_memory.items()},
+    )
+    print(
+        "集群所有NUMA节点空闲内存满足各内存选项的比例：",
+        (np.concatenate(list(free_memory.values()))[:, None] >= memory_options).mean(axis=0),
+    )
+
+    """[多智能体] 内存分配智能体根据观测做出内存分配决策"""
     memory = memory_options[step_count % len(memory_options)]
+
+    """[多智能体] 服务器类型智能体的观测空间包括以下特征"""
+    # 当前函数所属工作流的归一化已执行时间
+    # 函数的归一化标准执行时间
+    # 从当前函数节点出发的归一化标准关键路径长度
+    # 归一化已到达但尚未完成的工作流数量
+    remaining_lease_times = {
+        name: np.array([server_status.remaining_lease_time for server_status in server_statuses])
+        for name, server_statuses in cluster_status.items()
+    }
+    print(
+        "各类型已经租用的服务器数量占比：",
+        {name: (ndarray > 0).mean() for name, ndarray in remaining_lease_times.items()},
+    )
+    print(
+        "各类型已租用服务器的归一化平均剩余租期：",
+        {
+            name: ndarray[ndarray > 0].mean() / HOUR_IN_SECONDS if (ndarray > 0).any() else 0.0
+            for name, ndarray in remaining_lease_times.items()
+        },
+    )
+    total_parallelism = {
+        name: np.array(
+            [
+                nn_status.total_parallelism
+                for server_status in server_statuses
+                for nn_status in server_status.numa_node_statuses
+            ]
+        )
+        for name, server_statuses in cluster_status.items()
+    }
+    print(
+        "各类型中不会出现CPU资源竞争的NUMA节点数量占比：",
+        {
+            name: ((CFG_DICT[name][0] - parallelisms[wf_id, fn_id] - ndarray) >= 0).mean()
+            for name, ndarray in total_parallelism.items()
+        },
+    )
+    print(
+        "各类型中不会出现内存资源竞争的NUMA节点数量占比：",
+        {name: ((ndarray - memory) >= 0).mean() for name, ndarray in free_memory.items()},
+    )
+    total_data_size = 0
+    server_type_data_distribution = {srv.name: 0 for srv in cluster_config.servers}
+    for loc, size in data_distribution:
+        total_data_size += size
+        server_type_data_distribution[loc.server_name] += size
+    print(
+        "数据在不同类型服务器上的分布：",
+        (
+            np.zeros(len(server_type_data_distribution))
+            if total_data_size == 0
+            else (np.array(list(server_type_data_distribution.values())) / total_data_size)
+        ),
+    )
+
+    """[多智能体] 服务器类型智能体根据观测选择合适的服务器类型"""
+    server_name, server_id, numa_node_id = numa_options[step_count % len(numa_options)]
+
+    """[多智能体] NUMA节点智能体的观测空间包括以下特征"""
+    # 当前函数所属工作流的归一化已执行时间
+    # 函数的归一化标准执行时间
+    # 从当前函数节点出发的归一化标准关键路径长度
+    print(
+        "CPU利用率：",
+        np.array(
+            [
+                nn_status.cpu
+                for server_status in cluster_status[server_name]
+                for nn_status in server_status.numa_node_statuses
+            ]
+        ),
+    )
+    print(
+        "各NUMA节点的CPU资源是否足够：",
+        (CFG_DICT[server_name][0] - parallelisms[wf_id, fn_id] - total_parallelism[server_name])
+        / CFG_DICT[server_name][0],
+    )
+    print("各NUMA节点的内存资源是否足够：", (free_memory[server_name] - memory) / CFG_DICT[server_name][1])
+    print(
+        "各NUMA节点（下一个函数完成需要的时间，所有函数完成需要的时间）：",
+        np.array(
+            [
+                [log_squash(nn_status.time_to_first_completion), log_squash(nn_status.time_to_last_completion)]
+                for server_status in cluster_status[server_name]
+                for nn_status in server_status.numa_node_statuses
+            ]
+        ),
+    )
+    print("NUMA节点所在的服务器的剩余租期：", remaining_lease_times[server_name] / HOUR_IN_SECONDS)
+    print("将当前函数分配到该类型的NUMA节点的预计归一化数据传输时间：", norm_data_transfer_times[server_name])
+
+    """[单智能体] 状态空间包括以下特征"""
+    # 工作流、函数、工作负载总共 9 个特征
+    print("固定类型的NUMA节点特征（每个服务器只有一个NUMA节点）：", numa_node_features[server_name])
+    # 各NUMA节点（下一个函数完成需要的时间，所有函数完成需要的时间）
+    # 各NUMA节点的CPU资源是否足够
+    print(
+        "固定类型的NUMA节点空闲内存能满足的最大内存选项归一化索引：",
+        (
+            (np.searchsorted(memory_options, free_memory[server_name], side="right") - 1) / (len(memory_options) - 1)
+        ).clip(0, 1),
+    )
 
     env_log = env.step(server_name, server_id, numa_node_id, memory)
 
