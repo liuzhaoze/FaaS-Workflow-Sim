@@ -27,11 +27,12 @@ workflow_templates = [WorkflowTemplate(str(f), cluster_config.single_core_speed)
 memory_options = sorted([128, 256, 512, 1024])
 
 # NUMA 节点选项
-numa_options: list[tuple[str, int, int]] = []
-for server_config in cluster_config.servers:
-    for server_id in range(server_config.count):
-        for numa_node_id in range(server_config.numa_nodes.count):
-            numa_options.append((server_config.name, server_id, numa_node_id))
+numa_options: list[tuple[str, int, int]] = [
+    (srv.name, srv_id, nn_id)
+    for srv in cluster_config.servers
+    for srv_id in range(srv.count)
+    for nn_id in range(srv.numa_nodes.count)
+]
 
 env = RawEnv(arrival_times, workflow_templates, cluster_config)
 env.reset()
