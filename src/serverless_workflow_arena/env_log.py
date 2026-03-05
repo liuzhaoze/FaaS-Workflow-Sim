@@ -50,6 +50,7 @@ class EnvLog(NamedTuple):
         cold_start_time (float): 目标服务器的冷启动时间
         data_transfer_time (float): 函数容器执行前的数据传输时间
         finished_function_records (list[FunctionExecutionRecord]): 执行完毕的函数的开始和完成时间记录列表
+        finished_workflow_records (list[WorkflowExecutionRecord]): 执行完毕的工作流的完成时间记录列表
         rent (float): 函数容器在集群中执行所产生的租金
         terminated (bool): 环境是否结束
     """
