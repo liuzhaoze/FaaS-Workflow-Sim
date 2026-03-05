@@ -3,6 +3,8 @@
 集群配置模型
 """
 
+from typing import Any
+
 import yaml
 from pydantic import BaseModel, Field, model_validator
 
@@ -34,6 +36,13 @@ class ClusterConfig(BaseModel):
         with open(path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
         return cls(**data)
+
+    @model_validator(mode="before")
+    def remove_zero_count_servers(cls, data: dict[str, Any]) -> dict[str, Any]:
+        """移除数量为 0 的服务器类型"""
+        if "servers" in data:
+            data["servers"] = [s for s in data["servers"] if s.get("count", 0) > 0]
+        return data
 
     @model_validator(mode="after")
     def validate_bandwidths(self) -> "ClusterConfig":

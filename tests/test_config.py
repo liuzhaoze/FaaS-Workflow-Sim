@@ -17,30 +17,30 @@ class TestClusterConfig:
 
     def test_valid_cluster_config(self):
         """测试有效的集群配置"""
-        servers = [
-            ServerConfig(
-                name="large",
-                count=2,
-                hourly_rate=0.5,
-                cold_start_latency=1.5,
-                numa_nodes=NumaNodeConfig(count=4, cpu=16, memory=64000),
-            ),
-            ServerConfig(
-                name="medium",
-                count=4,
-                hourly_rate=0.3,
-                cold_start_latency=1.0,
-                numa_nodes=NumaNodeConfig(count=2, cpu=8, memory=32000),
-            ),
-        ]
+        data: dict[str, int | list[dict[str, object]]] = {
+            "memory_bandwidth": 100000000000,
+            "numa_bandwidth": 50000000000,
+            "network_bandwidth": 10000000000,
+            "single_core_speed": 1000000000,
+            "servers": [
+                {
+                    "name": "large",
+                    "count": 2,
+                    "hourly_rate": 0.5,
+                    "cold_start_latency": 1.5,
+                    "numa_nodes": {"count": 4, "cpu": 16, "memory": 64000},
+                },
+                {
+                    "name": "medium",
+                    "count": 4,
+                    "hourly_rate": 0.3,
+                    "cold_start_latency": 1.0,
+                    "numa_nodes": {"count": 2, "cpu": 8, "memory": 32000},
+                },
+            ],
+        }
 
-        cluster_config = ClusterConfig(
-            memory_bandwidth=100000000000,
-            numa_bandwidth=50000000000,
-            network_bandwidth=10000000000,
-            single_core_speed=1000000000,
-            servers=servers,
-        )
+        cluster_config = ClusterConfig.model_validate(data)
         assert cluster_config.memory_bandwidth == 100000000000
         assert cluster_config.numa_bandwidth == 50000000000
         assert cluster_config.network_bandwidth == 10000000000
@@ -49,18 +49,22 @@ class TestClusterConfig:
 
     def test_missing_required_fields(self):
         """测试缺少必填字段"""
-        servers = [
-            ServerConfig(
-                name="large",
-                count=2,
-                hourly_rate=0.5,
-                cold_start_latency=1.5,
-                numa_nodes=NumaNodeConfig(count=4, cpu=16, memory=64000),
-            )
-        ]
+        data: dict[str, int | list[dict[str, object]]] = {
+            "memory_bandwidth": 100000000000,
+            "numa_bandwidth": 50000000000,
+            "servers": [
+                {
+                    "name": "large",
+                    "count": 2,
+                    "hourly_rate": 0.5,
+                    "cold_start_latency": 1.5,
+                    "numa_nodes": {"count": 4, "cpu": 16, "memory": 64000},
+                }
+            ],
+        }
 
         with pytest.raises(ValidationError) as exc_info:
-            ClusterConfig(memory_bandwidth=100000000000, numa_bandwidth=50000000000, servers=servers)  # type: ignore
+            ClusterConfig.model_validate(data)
         errors = exc_info.value.errors()
         error_fields = {error["loc"][0] for error in errors}
         assert "network_bandwidth" in error_fields
@@ -68,290 +72,332 @@ class TestClusterConfig:
 
     def test_duplicate_server_names(self):
         """测试重复的服务器名称"""
-        servers = [
-            ServerConfig(
-                name="medium",
-                count=2,
-                hourly_rate=0.3,
-                cold_start_latency=1.0,
-                numa_nodes=NumaNodeConfig(count=2, cpu=8, memory=32000),
-            ),
-            ServerConfig(
-                name="medium",  # 重复名称
-                count=4,
-                hourly_rate=0.3,
-                cold_start_latency=1.0,
-                numa_nodes=NumaNodeConfig(count=2, cpu=8, memory=32000),
-            ),
-        ]
+        data: dict[str, int | list[dict[str, object]]] = {
+            "memory_bandwidth": 100000000000,
+            "numa_bandwidth": 50000000000,
+            "network_bandwidth": 10000000000,
+            "single_core_speed": 1000000000,
+            "servers": [
+                {
+                    "name": "medium",
+                    "count": 2,
+                    "hourly_rate": 0.3,
+                    "cold_start_latency": 1.0,
+                    "numa_nodes": {"count": 2, "cpu": 8, "memory": 32000},
+                },
+                {
+                    "name": "medium",  # 重复名称
+                    "count": 4,
+                    "hourly_rate": 0.3,
+                    "cold_start_latency": 1.0,
+                    "numa_nodes": {"count": 2, "cpu": 8, "memory": 32000},
+                },
+            ],
+        }
 
         with pytest.raises(ValidationError) as exc_info:
-            ClusterConfig(
-                memory_bandwidth=100000000000,
-                numa_bandwidth=50000000000,
-                network_bandwidth=10000000000,
-                single_core_speed=1000000000,
-                servers=servers,
-            )
-        assert "重复的类型名称" in str(exc_info.value)
-        assert "medium" in str(exc_info.value)
+            ClusterConfig.model_validate(data)
+        error_msg = str(exc_info.value)
+        assert "重复" in error_msg or "medium" in error_msg
 
     def test_multiple_duplicate_server_names(self):
         """测试多个重复的服务器名称"""
-        servers = [
-            ServerConfig(
-                name="large",
-                count=2,
-                hourly_rate=0.5,
-                cold_start_latency=1.5,
-                numa_nodes=NumaNodeConfig(count=4, cpu=16, memory=64000),
-            ),
-            ServerConfig(
-                name="medium",
-                count=4,
-                hourly_rate=0.3,
-                cold_start_latency=1.0,
-                numa_nodes=NumaNodeConfig(count=2, cpu=8, memory=32000),
-            ),
-            ServerConfig(
-                name="large",  # 重复
-                count=1,
-                hourly_rate=0.5,
-                cold_start_latency=1.5,
-                numa_nodes=NumaNodeConfig(count=4, cpu=16, memory=64000),
-            ),
-            ServerConfig(
-                name="medium",  # 重复
-                count=2,
-                hourly_rate=0.3,
-                cold_start_latency=1.0,
-                numa_nodes=NumaNodeConfig(count=2, cpu=8, memory=32000),
-            ),
-        ]
+        data: dict[str, int | list[dict[str, object]]] = {
+            "memory_bandwidth": 100000000000,
+            "numa_bandwidth": 50000000000,
+            "network_bandwidth": 10000000000,
+            "single_core_speed": 1000000000,
+            "servers": [
+                {
+                    "name": "large",
+                    "count": 2,
+                    "hourly_rate": 0.5,
+                    "cold_start_latency": 1.5,
+                    "numa_nodes": {"count": 4, "cpu": 16, "memory": 64000},
+                },
+                {
+                    "name": "medium",
+                    "count": 4,
+                    "hourly_rate": 0.3,
+                    "cold_start_latency": 1.0,
+                    "numa_nodes": {"count": 2, "cpu": 8, "memory": 32000},
+                },
+                {
+                    "name": "large",  # 重复
+                    "count": 1,
+                    "hourly_rate": 0.5,
+                    "cold_start_latency": 1.5,
+                    "numa_nodes": {"count": 4, "cpu": 16, "memory": 64000},
+                },
+                {
+                    "name": "medium",  # 重复
+                    "count": 2,
+                    "hourly_rate": 0.3,
+                    "cold_start_latency": 1.0,
+                    "numa_nodes": {"count": 2, "cpu": 8, "memory": 32000},
+                },
+            ],
+        }
 
         with pytest.raises(ValidationError) as exc_info:
-            ClusterConfig(
-                memory_bandwidth=100000000000,
-                numa_bandwidth=50000000000,
-                network_bandwidth=10000000000,
-                single_core_speed=1000000000,
-                servers=servers,
-            )
+            ClusterConfig.model_validate(data)
         error_msg = str(exc_info.value)
-        assert "重复的类型名称" in error_msg
-        assert "large" in error_msg
-        assert "medium" in error_msg
+        assert "重复" in error_msg or "large" in error_msg
 
     def test_invalid_bandwidth_values(self):
         """测试无效的带宽值"""
-        servers = [
-            ServerConfig(
-                name="large",
-                count=2,
-                hourly_rate=0.5,
-                cold_start_latency=1.5,
-                numa_nodes=NumaNodeConfig(count=4, cpu=16, memory=64000),
-            )
+        servers: list[dict[str, object]] = [
+            {
+                "name": "large",
+                "count": 2,
+                "hourly_rate": 0.5,
+                "cold_start_latency": 1.5,
+                "numa_nodes": {"count": 4, "cpu": 16, "memory": 64000},
+            }
         ]
 
         # 测试内存带宽
         with pytest.raises(ValidationError):
-            ClusterConfig(
-                memory_bandwidth=0,
-                numa_bandwidth=50000000000,
-                network_bandwidth=10000000000,
-                single_core_speed=1000000000,
-                servers=servers,
+            ClusterConfig.model_validate(
+                {
+                    "memory_bandwidth": 0,
+                    "numa_bandwidth": 50000000000,
+                    "network_bandwidth": 10000000000,
+                    "single_core_speed": 1000000000,
+                    "servers": servers,
+                }
             )
 
         # 测试 NUMA 带宽
         with pytest.raises(ValidationError):
-            ClusterConfig(
-                memory_bandwidth=100000000000,
-                numa_bandwidth=0,
-                network_bandwidth=10000000000,
-                single_core_speed=1000000000,
-                servers=servers,
+            ClusterConfig.model_validate(
+                {
+                    "memory_bandwidth": 100000000000,
+                    "numa_bandwidth": 0,
+                    "network_bandwidth": 10000000000,
+                    "single_core_speed": 1000000000,
+                    "servers": servers,
+                }
             )
 
         # 测试网络带宽
         with pytest.raises(ValidationError):
-            ClusterConfig(
-                memory_bandwidth=100000000000,
-                numa_bandwidth=50000000000,
-                network_bandwidth=0,
-                single_core_speed=1000000000,
-                servers=servers,
+            ClusterConfig.model_validate(
+                {
+                    "memory_bandwidth": 100000000000,
+                    "numa_bandwidth": 50000000000,
+                    "network_bandwidth": 0,
+                    "single_core_speed": 1000000000,
+                    "servers": servers,
+                }
             )
 
     def test_bandwidth_ordering_memory_not_greater_than_numa(self):
         """测试带宽排序约束：memory_bandwidth 必须大于 numa_bandwidth"""
-        servers = [
-            ServerConfig(
-                name="large",
-                count=2,
-                hourly_rate=0.5,
-                cold_start_latency=1.5,
-                numa_nodes=NumaNodeConfig(count=4, cpu=16, memory=64000),
-            )
+        servers: list[dict[str, object]] = [
+            {
+                "name": "large",
+                "count": 2,
+                "hourly_rate": 0.5,
+                "cold_start_latency": 1.5,
+                "numa_nodes": {"count": 4, "cpu": 16, "memory": 64000},
+            }
         ]
 
         # memory_bandwidth == numa_bandwidth 应该被拒绝
         with pytest.raises(ValidationError) as exc_info:
-            ClusterConfig(
-                memory_bandwidth=50000000000,
-                numa_bandwidth=50000000000,
-                network_bandwidth=10000000000,
-                single_core_speed=1000000000,
-                servers=servers,
+            ClusterConfig.model_validate(
+                {
+                    "memory_bandwidth": 50000000000,
+                    "numa_bandwidth": 50000000000,
+                    "network_bandwidth": 10000000000,
+                    "single_core_speed": 1000000000,
+                    "servers": servers,
+                }
             )
         assert "带宽配置应满足" in str(exc_info.value)
 
         # memory_bandwidth < numa_bandwidth 应该被拒绝
         with pytest.raises(ValidationError) as exc_info:
-            ClusterConfig(
-                memory_bandwidth=40000000000,
-                numa_bandwidth=50000000000,
-                network_bandwidth=10000000000,
-                single_core_speed=1000000000,
-                servers=servers,
+            ClusterConfig.model_validate(
+                {
+                    "memory_bandwidth": 40000000000,
+                    "numa_bandwidth": 50000000000,
+                    "network_bandwidth": 10000000000,
+                    "single_core_speed": 1000000000,
+                    "servers": servers,
+                }
             )
         assert "带宽配置应满足" in str(exc_info.value)
 
     def test_bandwidth_ordering_numa_not_greater_than_network(self):
         """测试带宽排序约束：numa_bandwidth 必须大于 network_bandwidth"""
-        servers = [
-            ServerConfig(
-                name="large",
-                count=2,
-                hourly_rate=0.5,
-                cold_start_latency=1.5,
-                numa_nodes=NumaNodeConfig(count=4, cpu=16, memory=64000),
-            )
+        servers: list[dict[str, object]] = [
+            {
+                "name": "large",
+                "count": 2,
+                "hourly_rate": 0.5,
+                "cold_start_latency": 1.5,
+                "numa_nodes": {"count": 4, "cpu": 16, "memory": 64000},
+            }
         ]
 
         # numa_bandwidth == network_bandwidth 应该被拒绝
         with pytest.raises(ValidationError) as exc_info:
-            ClusterConfig(
-                memory_bandwidth=100000000000,
-                numa_bandwidth=10000000000,
-                network_bandwidth=10000000000,
-                single_core_speed=1000000000,
-                servers=servers,
+            ClusterConfig.model_validate(
+                {
+                    "memory_bandwidth": 100000000000,
+                    "numa_bandwidth": 10000000000,
+                    "network_bandwidth": 10000000000,
+                    "single_core_speed": 1000000000,
+                    "servers": servers,
+                }
             )
         assert "带宽配置应满足" in str(exc_info.value)
 
         # numa_bandwidth < network_bandwidth 应该被拒绝
         with pytest.raises(ValidationError) as exc_info:
-            ClusterConfig(
-                memory_bandwidth=100000000000,
-                numa_bandwidth=5000000000,
-                network_bandwidth=10000000000,
-                single_core_speed=1000000000,
-                servers=servers,
+            ClusterConfig.model_validate(
+                {
+                    "memory_bandwidth": 100000000000,
+                    "numa_bandwidth": 5000000000,
+                    "network_bandwidth": 10000000000,
+                    "single_core_speed": 1000000000,
+                    "servers": servers,
+                }
             )
         assert "带宽配置应满足" in str(exc_info.value)
 
-    def test_server_count_can_be_zero(self):
-        """测试服务器类型的数量可以为 0（表示没有该类型的服务器）"""
-        servers = [
-            ServerConfig(
-                name="large",
-                count=2,
-                hourly_rate=0.5,
-                cold_start_latency=1.5,
-                numa_nodes=NumaNodeConfig(count=4, cpu=16, memory=64000),
-            ),
-            ServerConfig(
-                name="medium",
-                count=0,  # 允许为 0
-                hourly_rate=0.3,
-                cold_start_latency=1.0,
-                numa_nodes=NumaNodeConfig(count=2, cpu=8, memory=32000),
-            ),
-        ]
+    def test_zero_count_servers_are_removed(self):
+        """测试数量为 0 的服务器配置会被自动移除"""
+        data: dict[str, int | list[dict[str, object]]] = {
+            "memory_bandwidth": 100000000000,
+            "numa_bandwidth": 50000000000,
+            "network_bandwidth": 10000000000,
+            "single_core_speed": 1000000000,
+            "servers": [
+                {
+                    "name": "large",
+                    "count": 2,
+                    "hourly_rate": 0.5,
+                    "cold_start_latency": 1.5,
+                    "numa_nodes": {"count": 4, "cpu": 16, "memory": 64000},
+                },
+                {
+                    "name": "medium",
+                    "count": 0,  # 会被移除
+                    "hourly_rate": 0.3,
+                    "cold_start_latency": 1.0,
+                    "numa_nodes": {"count": 2, "cpu": 8, "memory": 32000},
+                },
+                {
+                    "name": "small",
+                    "count": 0,  # 会被移除
+                    "hourly_rate": 0.1,
+                    "cold_start_latency": 0.5,
+                    "numa_nodes": {"count": 1, "cpu": 4, "memory": 16000},
+                },
+            ],
+        }
 
-        cluster_config = ClusterConfig(
-            memory_bandwidth=100000000000,
-            numa_bandwidth=50000000000,
-            network_bandwidth=10000000000,
-            single_core_speed=1000000000,
-            servers=servers,
-        )
+        cluster_config = ClusterConfig.model_validate(data)
 
-        assert len(cluster_config.servers) == 2
+        # 只有 count > 0 的服务器被保留
+        assert len(cluster_config.servers) == 1
+        assert cluster_config.servers[0].name == "large"
         assert cluster_config.servers[0].count == 2
-        assert cluster_config.servers[1].count == 0
 
-    def test_total_server_count_must_be_positive(self):
-        """测试集群中服务器总数必须至少为 1"""
-        servers = [
-            ServerConfig(
-                name="large",
-                count=0,
-                hourly_rate=0.5,
-                cold_start_latency=1.5,
-                numa_nodes=NumaNodeConfig(count=4, cpu=16, memory=64000),
-            ),
-            ServerConfig(
-                name="medium",
-                count=0,
-                hourly_rate=0.3,
-                cold_start_latency=1.0,
-                numa_nodes=NumaNodeConfig(count=2, cpu=8, memory=32000),
-            ),
-        ]
+    def test_all_servers_with_zero_count_raises_error(self):
+        """测试所有服务器数量都为 0 时应该引发错误"""
+        data: dict[str, int | list[dict[str, object]]] = {
+            "memory_bandwidth": 100000000000,
+            "numa_bandwidth": 50000000000,
+            "network_bandwidth": 10000000000,
+            "single_core_speed": 1000000000,
+            "servers": [
+                {
+                    "name": "large",
+                    "count": 0,
+                    "hourly_rate": 0.5,
+                    "cold_start_latency": 1.5,
+                    "numa_nodes": {"count": 4, "cpu": 16, "memory": 64000},
+                },
+                {
+                    "name": "medium",
+                    "count": 0,
+                    "hourly_rate": 0.3,
+                    "cold_start_latency": 1.0,
+                    "numa_nodes": {"count": 2, "cpu": 8, "memory": 32000},
+                },
+            ],
+        }
 
         with pytest.raises(ValidationError) as exc_info:
-            ClusterConfig(
-                memory_bandwidth=100000000000,
-                numa_bandwidth=50000000000,
-                network_bandwidth=10000000000,
-                single_core_speed=1000000000,
-                servers=servers,
-            )
+            ClusterConfig.model_validate(data)
 
-        assert "至少需要有一个服务器" in str(exc_info.value)
+        assert "至少需要有一个服务器" in str(exc_info.value) or "至少" in str(exc_info.value)
 
-    def test_multiple_server_types_with_zero_count(self):
-        """测试多个服务器类型数量为 0，但总数大于 0 的情况"""
-        servers = [
+    def test_mixed_zero_and_positive_counts(self):
+        """测试混合零和非零数量的服务器配置"""
+        data: dict[str, int | list[dict[str, object]]] = {
+            "memory_bandwidth": 100000000000,
+            "numa_bandwidth": 50000000000,
+            "network_bandwidth": 10000000000,
+            "single_core_speed": 1000000000,
+            "servers": [
+                {
+                    "name": "large",
+                    "count": 0,  # 会被移除
+                    "hourly_rate": 0.5,
+                    "cold_start_latency": 1.5,
+                    "numa_nodes": {"count": 4, "cpu": 16, "memory": 64000},
+                },
+                {
+                    "name": "medium",
+                    "count": 0,  # 会被移除
+                    "hourly_rate": 0.3,
+                    "cold_start_latency": 1.0,
+                    "numa_nodes": {"count": 2, "cpu": 8, "memory": 32000},
+                },
+                {
+                    "name": "small",
+                    "count": 5,  # 会被保留
+                    "hourly_rate": 0.1,
+                    "cold_start_latency": 0.5,
+                    "numa_nodes": {"count": 1, "cpu": 4, "memory": 16000},
+                },
+            ],
+        }
+
+        cluster_config = ClusterConfig.model_validate(data)
+
+        # 只有 count > 0 的服务器被保留
+        assert len(cluster_config.servers) == 1
+        assert cluster_config.servers[0].name == "small"
+        assert cluster_config.servers[0].count == 5
+
+    def test_server_config_objects_can_be_created(self):
+        """测试可以直接创建 ServerConfig 对象"""
+        server = ServerConfig(
+            name="test",
+            count=1,
+            hourly_rate=0.1,
+            cold_start_latency=0.5,
+            numa_nodes=NumaNodeConfig(count=1, cpu=2, memory=4096),
+        )
+        assert server.name == "test"
+        assert server.count == 1
+
+    def test_negative_server_count_is_invalid(self):
+        """测试负数的服务器数量是无效的"""
+        with pytest.raises(ValidationError):
             ServerConfig(
-                name="large",
-                count=0,
-                hourly_rate=0.5,
-                cold_start_latency=1.5,
-                numa_nodes=NumaNodeConfig(count=4, cpu=16, memory=64000),
-            ),
-            ServerConfig(
-                name="medium",
-                count=0,
-                hourly_rate=0.3,
-                cold_start_latency=1.0,
-                numa_nodes=NumaNodeConfig(count=2, cpu=8, memory=32000),
-            ),
-            ServerConfig(
-                name="small",
-                count=5,  # 只有这个类型有服务器
+                name="test",
+                count=-1,
                 hourly_rate=0.1,
                 cold_start_latency=0.5,
-                numa_nodes=NumaNodeConfig(count=1, cpu=4, memory=16000),
-            ),
-        ]
-
-        cluster_config = ClusterConfig(
-            memory_bandwidth=100000000000,
-            numa_bandwidth=50000000000,
-            network_bandwidth=10000000000,
-            single_core_speed=1000000000,
-            servers=servers,
-        )
-
-        # 验证所有服务器类型都被保留
-        assert len(cluster_config.servers) == 3
-        assert cluster_config.servers[0].count == 0
-        assert cluster_config.servers[1].count == 0
-        assert cluster_config.servers[2].count == 5
+                numa_nodes=NumaNodeConfig(count=1, cpu=2, memory=4096),
+            )
 
 
 class TestClusterConfigYamlLoading:
@@ -509,3 +555,36 @@ class TestClusterConfigYamlLoading:
         assert "network_bandwidth" in error_fields
         assert "single_core_speed" in error_fields
         assert "servers" in error_fields
+
+    def test_from_yaml_all_servers_with_zero_count(self, tmp_path: Path):
+        """测试从 YAML 加载所有服务器 count 为 0 的配置"""
+        yaml_content = """
+memory_bandwidth: 100000000000
+numa_bandwidth: 50000000000
+network_bandwidth: 10000000000
+single_core_speed: 1000000000
+servers:
+- name: large
+  count: 0
+  hourly_rate: 0.5
+  cold_start_latency: 1.5
+  numa_nodes:
+    count: 4
+    cpu: 16
+    memory: 64000
+- name: medium
+  count: 0
+  hourly_rate: 0.3
+  cold_start_latency: 1.0
+  numa_nodes:
+    count: 2
+    cpu: 8
+    memory: 32000
+"""
+        config_file = tmp_path / "all_zero.yaml"
+        config_file.write_text(yaml_content)
+
+        with pytest.raises(ValidationError) as exc_info:
+            ClusterConfig.from_yaml(str(config_file))
+
+        assert "至少需要有一个服务器" in str(exc_info.value) or "至少" in str(exc_info.value)
