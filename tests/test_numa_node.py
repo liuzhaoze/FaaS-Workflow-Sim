@@ -760,3 +760,133 @@ class TestNumaNode:
         assert record_at_6_0.timestamp == 6.0
         assert record_at_6_0.total_parallelism == 0  # 无容器运行
         assert record_at_6_0.free_memory == 8192  # 所有内存释放
+
+
+class TestNumaNodeGetStatusAt:
+    """测试 NumaNode 类的 get_status_at 方法"""
+
+    @pytest.fixture
+    def numa_node(self) -> NumaNode:
+        """创建 NUMA 节点"""
+        return NumaNode(node_id=0, cpu=4, memory=8192, single_core_speed=1000)
+
+    def test_get_status_at_empty_node(self, numa_node: NumaNode):
+        """测试空节点（无容器）的状态"""
+        numa_node.reset()
+
+        status = numa_node.get_status_at(0.0)
+
+        assert status.cpu == 0.0
+        assert status.memory == 0.0
+        assert status.load == 0.0
+        assert status.total_parallelism == 0
+        assert status.free_memory == 8192
+        assert status.time_to_first_completion == 0.0
+        assert status.time_to_last_completion == 0.0
+
+    def test_get_status_at_with_running_container(self, numa_node: NumaNode):
+        """测试有运行中容器时的节点状态"""
+        numa_node.reset()
+
+        # 创建一个容器：computation=4000，speed=1000，需要4秒
+        # submission_time=0, data_transfer_time=0，start_time=0, completion_time=4.0
+        c = Container(
+            wf_id=1,
+            fn_id=1,
+            memory_req=1024,
+            memory_alloc=1024,
+            computation=4000,
+            parallelism=1,
+            submission_time=0.0,
+            data_transfer_time=0.0,
+        )
+        numa_node.on_container_creation(c)
+
+        # 在时间点 0.0 查询状态（容器刚开始执行）
+        status = numa_node.get_status_at(0.0)
+
+        assert status.total_parallelism == 1
+        assert status.free_memory == 8192 - 1024
+        assert status.time_to_first_completion == pytest.approx(4.0, rel=1e-9)  # type: ignore
+        assert status.time_to_last_completion == pytest.approx(4.0, rel=1e-9)  # type: ignore
+
+    def test_get_status_at_future_time(self, numa_node: NumaNode):
+        """测试在容器完成后查询历史时间点的状态（time_to_*_completion 不会为负）"""
+        numa_node.reset()
+
+        # 创建一个容器：completion_time=2.0
+        c = Container(
+            wf_id=1,
+            fn_id=1,
+            memory_req=512,
+            memory_alloc=512,
+            computation=2000,
+            parallelism=1,
+            submission_time=0.0,
+            data_transfer_time=0.0,
+        )
+        numa_node.on_container_creation(c)
+
+        # 在容器完成后的时间点查询（time > completion_time），time_to_*_completion 应为 0
+        status = numa_node.get_status_at(5.0)
+
+        assert status.time_to_first_completion == 0.0
+        assert status.time_to_last_completion == 0.0
+
+    def test_get_status_at_multiple_containers(self, numa_node: NumaNode):
+        """测试有多个容器时的节点状态"""
+        numa_node.reset()
+
+        # 容器1：computation=2000，parallelism=1，memory=512，完成时间较早
+        c1 = Container(
+            wf_id=1,
+            fn_id=1,
+            memory_req=512,
+            memory_alloc=512,
+            computation=2000,
+            parallelism=1,
+            submission_time=0.0,
+            data_transfer_time=0.0,
+        )
+        # 容器2：computation=8000，parallelism=2，memory=1024，完成时间较晚
+        c2 = Container(
+            wf_id=2,
+            fn_id=1,
+            memory_req=1024,
+            memory_alloc=1024,
+            computation=8000,
+            parallelism=2,
+            submission_time=0.0,
+            data_transfer_time=0.0,
+        )
+        numa_node.on_container_creation(c1)
+        numa_node.on_container_creation(c2)
+
+        status = numa_node.get_status_at(0.0)
+
+        assert status.total_parallelism == 3  # 1 + 2
+        assert status.free_memory == 8192 - 512 - 1024
+
+        # time_to_first_completion < time_to_last_completion
+        assert status.time_to_first_completion < status.time_to_last_completion
+
+    def test_get_status_at_time_to_completion_decreases(self, numa_node: NumaNode):
+        """测试随时间推移，time_to_*_completion 减小"""
+        numa_node.reset()
+
+        c = Container(
+            wf_id=1,
+            fn_id=1,
+            memory_req=512,
+            memory_alloc=512,
+            computation=4000,
+            parallelism=1,
+            submission_time=0.0,
+            data_transfer_time=0.0,
+        )
+        numa_node.on_container_creation(c)
+
+        status_early = numa_node.get_status_at(0.0)
+        status_later = numa_node.get_status_at(1.0)
+
+        assert status_early.time_to_last_completion > status_later.time_to_last_completion

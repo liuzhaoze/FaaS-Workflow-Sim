@@ -20,7 +20,7 @@ arrival_times = [float(i) for i in range(5)]
 workflow_templates = [WorkflowTemplate(str(f), cluster_config.single_core_speed) for f in dax_files]
 
 # 内存大小选项
-memory_options = [128, 256, 512, 1024]
+memory_options = sorted([128, 256, 512, 1024])
 
 # NUMA 节点选项
 numa_options: list[tuple[str, int, int]] = []

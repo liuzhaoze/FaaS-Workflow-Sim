@@ -10,6 +10,28 @@ from typing import Literal, NamedTuple
 from .container import Container
 
 
+class NumaNodeStatus(NamedTuple):
+    """NUMA 节点状态
+
+    Attributes:
+        cpu (float): CPU 利用率
+        memory (float): 内存利用率
+        load (float): 负载水平
+        total_parallelism (int): NUMA 节点上运行的总并行度
+        free_memory (int): 可用内存大小 (MB)
+        time_to_first_completion (float): 第一个容器执行完成需要经历的时间 (单位：秒)
+        time_to_last_completion (float): 最后一个容器执行完成需要经历的时间 (单位：秒)
+    """
+
+    cpu: float
+    memory: float
+    load: float
+    total_parallelism: int
+    free_memory: int
+    time_to_first_completion: float
+    time_to_last_completion: float
+
+
 class NumaNode:
     """NUMA 节点模型
 
@@ -288,7 +310,7 @@ class NumaNode:
         """更新所有正在运行的容器到指定时间点的剩余计算量
 
         Args:
-            time (float): 指定时间点
+            time (float): 时间点
         """
         if time < self._current_time:
             raise ValueError(f"Update time {time} cannot be earlier than current time {self._current_time}")
@@ -365,6 +387,33 @@ class NumaNode:
             return (None, float("-inf"))
 
         return max(((i, c.completion_time) for i, c in enumerate(self._running_containers)), key=lambda x: x[1])
+
+    def get_status_at(self, time: float) -> NumaNodeStatus:
+        """获得指定时间点的 NUMA 节点状态
+
+        Args:
+            time (float): 时间点
+
+        Returns:
+            NumaNodeStatus: NUMA 节点状态
+        """
+        r = self._rum.get_record_at(time)
+
+        c, t = self.get_earliest_finished()
+        time_to_first_completion = 0.0 if c is None else max(0.0, t - time)
+
+        c, t = self.get_latest_finished()
+        time_to_last_completion = 0.0 if c is None else max(0.0, t - time)
+
+        return NumaNodeStatus(
+            r.cpu,
+            r.memory,
+            r.load,
+            r.total_parallelism,
+            r.free_memory,
+            time_to_first_completion,
+            time_to_last_completion,
+        )
 
 
 class UtilizationRecord(NamedTuple):

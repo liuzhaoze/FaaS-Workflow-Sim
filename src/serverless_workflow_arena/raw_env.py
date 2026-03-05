@@ -6,7 +6,7 @@
 from .cluster import Cluster
 from .config import ClusterConfig
 from .container import Container
-from .env_log import EnvLog, FunctionExecutionRecord
+from .env_log import EnvLog, FunctionExecutionRecord, WorkflowExecutionRecord
 from .location import Location
 from .workflow_template import WorkflowTemplate
 from .workload import SubmittedFunc, Workload
@@ -29,6 +29,7 @@ class RawEnv:
 
         self.current_function: SubmittedFunc | None = None
         self._location_records: dict[tuple[int, int], Location] = {}
+        self._active_workflows: set[int] = set()
 
     def reset(self):
         """重置无服务器计算环境"""
@@ -36,7 +37,12 @@ class RawEnv:
         self.cluster.reset()
 
         self.current_function = self.workload.get()
+        if self.current_function is None:
+            raise RuntimeError("Environment reset failed: no functions in the workload.")
+
         self._location_records.clear()
+        self._active_workflows.clear()
+        self._active_workflows.add(self.current_function.wf_id)
 
     def step(self, server_name: str, server_id: int, numa_node_id: int, allocated_memory: int) -> EnvLog:
         """无服务器计算状态转移逻辑
@@ -89,10 +95,14 @@ class RawEnv:
 
         # 获取下一个函数
         function_execution_records: list[FunctionExecutionRecord] = []
+        workflow_execution_records: list[WorkflowExecutionRecord] = []
 
-        while (not self.workload.completed) and (
-            self.workload.peek() is None or self.cluster.earliest_finished_time <= self.workload.peek().submission_time  # type: ignore
+        candidate_function = self.workload.peek()
+        while (candidate_function and self.cluster.earliest_finished_time <= candidate_function.submission_time) or (
+            (not candidate_function) and (not self.workload.completed)
         ):
+            # 当提交队列存在函数时，应先处理候选函数提交前完成的容器，这些容器完成后触发的后继函数会在候选函数之前提交
+            # 当提交队列为空时，应持续完成容器直到触发新的后继函数提交或直到工作负载完成
             r, c = self.cluster.on_container_completion()
             rent += r
             self.workload.run_function(c.wf_id, c.fn_id, c.start_time)
@@ -101,7 +111,15 @@ class RawEnv:
                 FunctionExecutionRecord(c.wf_id, c.fn_id, c.start_time, c.completion_time)
             )
 
+            if self.workload[c.wf_id].completed:
+                self._active_workflows.remove(c.wf_id)
+                workflow_execution_records.append(WorkflowExecutionRecord(c.wf_id, c.completion_time))
+
+            candidate_function = self.workload.peek()
+
         self.current_function = self.workload.get()
+        if self.current_function is not None:
+            self._active_workflows.add(self.current_function.wf_id)
 
         # 返回本次步骤的环境日志
         return EnvLog(
@@ -117,6 +135,33 @@ class RawEnv:
             cold_start_time=cold_start_time,
             data_transfer_time=data_transfer_time,
             finished_function_records=function_execution_records,
+            finished_workflow_records=workflow_execution_records,
             rent=rent,
             terminated=self.workload.completed,
         )
+
+    @property
+    def submit_queue_length(self) -> int:
+        """当前提交队列长度"""
+        return self.workload.submit_queue.qsize()
+
+    @property
+    def active_workflow_count(self) -> int:
+        """当前已到达但尚未完成的工作流数量"""
+        return len(self._active_workflows)
+
+    def get_data_distribution(self, wf_id: int, fn_id: int) -> list[tuple[Location, int]]:
+        """获取指定函数的前驱函数数据在集群中的分布
+
+        Args:
+            wf_id (int): 工作流ID
+            fn_id (int): 函数ID
+
+        Returns:
+            list[tuple[Location, int]]: 列表中的元素为前驱函数数据所在的 NUMA 节点位置和数据大小的二元组
+        """
+
+        return [
+            (self._location_records[(wf_id, pred_fn_id)], data_size)
+            for pred_fn_id, _, data_size in self.workload[wf_id].get_predecessor_functions(fn_id)
+        ]

@@ -4,11 +4,28 @@
 """
 
 import math
+from typing import NamedTuple
 
 from .container import Container
-from .numa_node import NumaNode
+from .numa_node import NumaNode, NumaNodeStatus
 
 HOUR = 3600.0
+
+
+class ServerStatus(NamedTuple):
+    """服务器状态
+
+    Attributes:
+        remaining_lease_time (float): 服务器剩余租期
+        time_to_first_completion (float): 第一个容器执行完成需要经历的时间 (单位：秒)
+        time_to_last_completion (float): 最后一个容器执行完成需要经历的时间 (单位：秒)
+        numa_node_statuses (tuple[NumaNodeStatus, ...]): 服务器上每个 NUMA 节点的状态
+    """
+
+    remaining_lease_time: float
+    time_to_first_completion: float
+    time_to_last_completion: float
+    numa_node_statuses: tuple[NumaNodeStatus, ...]
 
 
 class Server:
@@ -233,3 +250,27 @@ class Server:
             nn.on_server_startup(time, self.cold_start_latency)
 
         return self.cold_start_latency
+
+    def get_status_at(self, time: float) -> ServerStatus:
+        """获得指定时间点的服务器状态
+
+        Args:
+            time (float): 时间点
+
+        Returns:
+            ServerStatus: 服务器状态
+        """
+
+        remaining_lease_time = max(0.0, self.expiration_time - time)
+
+        time_to_first_completion = (
+            0.0 if self.earliest_finished_nn_id is None else max(0.0, self.earliest_finished_time - time)
+        )
+
+        time_to_last_completion = (
+            0.0 if self.latest_finished_nn_id is None else max(0.0, self.latest_finished_time - time)
+        )
+
+        numa_node_statuses = tuple(nn.get_status_at(time) for nn in self._numa_nodes)
+
+        return ServerStatus(remaining_lease_time, time_to_first_completion, time_to_last_completion, numa_node_statuses)

@@ -184,6 +184,74 @@ class TestClusterConfig:
                 servers=servers,
             )
 
+    def test_bandwidth_ordering_memory_not_greater_than_numa(self):
+        """测试带宽排序约束：memory_bandwidth 必须大于 numa_bandwidth"""
+        servers = [
+            ServerConfig(
+                name="large",
+                count=2,
+                hourly_rate=0.5,
+                cold_start_latency=1.5,
+                numa_nodes=NumaNodeConfig(count=4, cpu=16, memory=64000),
+            )
+        ]
+
+        # memory_bandwidth == numa_bandwidth 应该被拒绝
+        with pytest.raises(ValidationError) as exc_info:
+            ClusterConfig(
+                memory_bandwidth=50000000000,
+                numa_bandwidth=50000000000,
+                network_bandwidth=10000000000,
+                single_core_speed=1000000000,
+                servers=servers,
+            )
+        assert "带宽配置应满足" in str(exc_info.value)
+
+        # memory_bandwidth < numa_bandwidth 应该被拒绝
+        with pytest.raises(ValidationError) as exc_info:
+            ClusterConfig(
+                memory_bandwidth=40000000000,
+                numa_bandwidth=50000000000,
+                network_bandwidth=10000000000,
+                single_core_speed=1000000000,
+                servers=servers,
+            )
+        assert "带宽配置应满足" in str(exc_info.value)
+
+    def test_bandwidth_ordering_numa_not_greater_than_network(self):
+        """测试带宽排序约束：numa_bandwidth 必须大于 network_bandwidth"""
+        servers = [
+            ServerConfig(
+                name="large",
+                count=2,
+                hourly_rate=0.5,
+                cold_start_latency=1.5,
+                numa_nodes=NumaNodeConfig(count=4, cpu=16, memory=64000),
+            )
+        ]
+
+        # numa_bandwidth == network_bandwidth 应该被拒绝
+        with pytest.raises(ValidationError) as exc_info:
+            ClusterConfig(
+                memory_bandwidth=100000000000,
+                numa_bandwidth=10000000000,
+                network_bandwidth=10000000000,
+                single_core_speed=1000000000,
+                servers=servers,
+            )
+        assert "带宽配置应满足" in str(exc_info.value)
+
+        # numa_bandwidth < network_bandwidth 应该被拒绝
+        with pytest.raises(ValidationError) as exc_info:
+            ClusterConfig(
+                memory_bandwidth=100000000000,
+                numa_bandwidth=5000000000,
+                network_bandwidth=10000000000,
+                single_core_speed=1000000000,
+                servers=servers,
+            )
+        assert "带宽配置应满足" in str(exc_info.value)
+
     def test_server_count_can_be_zero(self):
         """测试服务器类型的数量可以为 0（表示没有该类型的服务器）"""
         servers = [

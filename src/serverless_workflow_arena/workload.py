@@ -35,7 +35,7 @@ class Workload:
 
     __slots__ = (
         "_workflows",
-        "_submit_queue",
+        "submit_queue",
     )
 
     def __init__(self, arrival_times: list[float], workflow_templates: list[WorkflowTemplate]):
@@ -61,7 +61,7 @@ class Workload:
             for i, (a, t) in enumerate(zip(arrival_times, workflow_template_indices))
         ]
 
-        self._submit_queue: PriorityQueue[SubmittedFunc] = PriorityQueue()
+        self.submit_queue: PriorityQueue[SubmittedFunc] = PriorityQueue()
 
     def __len__(self) -> int:
         return len(self._workflows)
@@ -78,7 +78,7 @@ class Workload:
             wf.reset()
 
         # 清空提交队列
-        self._submit_queue.queue.clear()
+        self.submit_queue.queue.clear()
 
         # 提交所有工作流的源点函数
         for wf in self._workflows:
@@ -86,20 +86,20 @@ class Workload:
             for fn_id in source_fns:
                 submission_time = wf.arrival_time
                 wf.submit_function(fn_id, submission_time)
-                self._submit_queue.put(SubmittedFunc(submission_time, wf.wf_id, fn_id))
+                self.submit_queue.put(SubmittedFunc(submission_time, wf.wf_id, fn_id))
 
     def peek(self) -> SubmittedFunc | None:
         """查看下一个函数，但不从队列中移除"""
-        with self._submit_queue.mutex:
-            if self._submit_queue.queue:
-                return self._submit_queue.queue[0]
+        with self.submit_queue.mutex:
+            if self.submit_queue.queue:
+                return self.submit_queue.queue[0]
             else:
                 return None
 
     def get(self) -> SubmittedFunc | None:
         """获取下一个函数，并从队列中移除"""
-        if not self._submit_queue.empty():
-            return self._submit_queue.get()
+        if not self.submit_queue.empty():
+            return self.submit_queue.get()
         else:
             return None
 
@@ -117,7 +117,7 @@ class Workload:
         # 提交可提交的函数
         for f in submittable_fns:
             self._workflows[wf_id].submit_function(f.fn_id, f.submission_time)
-            self._submit_queue.put(SubmittedFunc(f.submission_time, wf_id, f.fn_id))
+            self.submit_queue.put(SubmittedFunc(f.submission_time, wf_id, f.fn_id))
 
     @property
     def completed(self) -> bool:

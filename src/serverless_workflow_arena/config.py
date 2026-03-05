@@ -36,6 +36,13 @@ class ClusterConfig(BaseModel):
         return cls(**data)
 
     @model_validator(mode="after")
+    def validate_bandwidths(self) -> "ClusterConfig":
+        if not (self.memory_bandwidth > self.numa_bandwidth > self.network_bandwidth):
+            raise ValueError("带宽配置应满足 memory_bandwidth > numa_bandwidth > network_bandwidth")
+
+        return self
+
+    @model_validator(mode="after")
     def validate_unique_server_names(self) -> "ClusterConfig":
         names = [server.name for server in self.servers]
         unique_names = set(names)

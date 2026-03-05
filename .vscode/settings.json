@@ -2,6 +2,10 @@
     "python.analysis.typeCheckingMode": "strict",
     "cSpell.words": [
         "funcs",
+        "keepdims",
+        "makespan",
+        "makespans",
+        "ndindex",
         "numa",
         "pycache",
         "reqs",

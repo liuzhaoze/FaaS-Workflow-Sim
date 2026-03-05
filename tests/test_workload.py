@@ -167,12 +167,12 @@ class TestWorkload:
         workload.reset()
 
         # 验证队列不为空（应该有源点函数）
-        assert not workload._submit_queue.empty()  # type: ignore
+        assert not workload.submit_queue.empty()
 
         # 验证提交队列包含所有工作流的源点函数
         submitted_funcs: list[SubmittedFunc] = []
-        while not workload._submit_queue.empty():  # type: ignore
-            submitted_funcs.append(workload._submit_queue.get())  # type: ignore
+        while not workload.submit_queue.empty():
+            submitted_funcs.append(workload.submit_queue.get())
 
         # 每个工作流都应该有源点函数被提交
         workflow_ids = {f.wf_id for f in submitted_funcs}
@@ -203,8 +203,8 @@ class TestWorkload:
         workload = Workload(arrival_times, workflow_templates)
 
         # 清空队列
-        while not workload._submit_queue.empty():  # type: ignore
-            workload._submit_queue.get()  # type: ignore
+        while not workload.submit_queue.empty():
+            workload.submit_queue.get()
 
         result = workload.peek()
         assert result is None
@@ -223,17 +223,17 @@ class TestWorkload:
         assert result == result2
 
         # 队列大小不变
-        initial_size = workload._submit_queue.qsize()  # type: ignore
+        initial_size = workload.submit_queue.qsize()
         workload.peek()
-        assert workload._submit_queue.qsize() == initial_size  # type: ignore
+        assert workload.submit_queue.qsize() == initial_size
 
     def test_get_empty_queue(self, workflow_templates: list[WorkflowTemplate], arrival_times: list[float]):
         """测试从空队列获取"""
         workload = Workload(arrival_times, workflow_templates)
 
         # 清空队列
-        while not workload._submit_queue.empty():  # type: ignore
-            workload._submit_queue.get()  # type: ignore
+        while not workload.submit_queue.empty():
+            workload.submit_queue.get()
 
         result = workload.get()
         assert result is None
@@ -243,14 +243,14 @@ class TestWorkload:
         workload = Workload(arrival_times, workflow_templates)
         workload.reset()  # 确保队列有内容
 
-        initial_size = workload._submit_queue.qsize()  # type: ignore
+        initial_size = workload.submit_queue.qsize()
 
         result = workload.get()
         assert result is not None
         assert isinstance(result, SubmittedFunc)
 
         # 验证 get 会移除元素
-        assert workload._submit_queue.qsize() == initial_size - 1  # type: ignore
+        assert workload.submit_queue.qsize() == initial_size - 1
 
     def test_run_function(self, workflow_templates: list[WorkflowTemplate], arrival_times: list[float]):
         """测试运行函数"""
@@ -281,7 +281,7 @@ class TestWorkload:
             # 运行并完成函数
             workload.run_function(func.wf_id, func.fn_id, func.submission_time + 1.0)
 
-            initial_queue_size = workload._submit_queue.qsize()  # type: ignore
+            initial_queue_size = workload.submit_queue.qsize()
             workload.finish_function(func.wf_id, func.fn_id, func.submission_time + 3.0)
 
             # 验证原函数完成
@@ -291,12 +291,12 @@ class TestWorkload:
 
             # 检查是否有新的函数被添加到队列
             # 如果后继函数只有这一个前驱，那么它应该被添加到队列
-            successors = workflow._dag.successor_indices(func.fn_id)  # type: ignore
+            successors = workflow.dag.successor_indices(func.fn_id)
             for succ in successors:
-                predecessors = workflow._dag.predecessor_indices(succ)  # type: ignore
+                predecessors = workflow.dag.predecessor_indices(succ)
                 if set(predecessors) <= {func.fn_id}:  # 所有前驱都已完成
                     # 应该有新函数被添加
-                    assert workload._submit_queue.qsize() >= initial_queue_size  # type: ignore
+                    assert workload.submit_queue.qsize() >= initial_queue_size
 
     def test_finish_function_without_successors(
         self, workflow_templates: list[WorkflowTemplate], arrival_times: list[float]
@@ -310,17 +310,17 @@ class TestWorkload:
         for i in range(len(arrival_times)):
             wf = workload[i]
             for fn_id in range(len(wf)):
-                successors = wf._dag.successor_indices(fn_id)  # type: ignore
+                successors = wf.dag.successor_indices(fn_id)
                 if not successors:  # 没有后继
                     # 需要先提交这个函数
                     wf.submit_function(fn_id, wf.arrival_time)
                     workload.run_function(wf.wf_id, fn_id, wf.arrival_time + 1.0)
 
-                    initial_queue_size = workload._submit_queue.qsize()  # type: ignore
+                    initial_queue_size = workload.submit_queue.qsize()
                     workload.finish_function(wf.wf_id, fn_id, wf.arrival_time + 3.0)
 
                     # 验证没有新函数被添加到队列
-                    assert workload._submit_queue.qsize() == initial_queue_size  # type: ignore
+                    assert workload.submit_queue.qsize() == initial_queue_size
                     found = True
                     break
             if found:
@@ -346,8 +346,8 @@ class TestWorkload:
 
         # 获取所有提交的函数并验证它们是按时间排序的
         submitted_funcs: list[SubmittedFunc] = []
-        while not workload._submit_queue.empty():  # type: ignore
-            submitted_funcs.append(workload._submit_queue.get())  # type: ignore
+        while not workload.submit_queue.empty():
+            submitted_funcs.append(workload.submit_queue.get())
 
         # 验证时间是非递减的
         for i in range(1, len(submitted_funcs)):
@@ -590,7 +590,7 @@ class TestWorkload:
                 fn_completion_time = wf[fn_id].completion_time
 
                 # 检查所有后继函数
-                successors = wf._dag.successor_indices(fn_id)  # type: ignore
+                successors = wf.dag.successor_indices(fn_id)
                 for succ_id in successors:
                     succ_start_time = wf[succ_id].start_time
                     assert (
