@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from serverless_workflow_arena import ClusterConfig, RawEnv, WorkflowTemplate
+from serverless_workflow_arena.env_log import WorkflowExecutionRecord
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -339,9 +340,6 @@ class TestRawEnvProperties:
         env = RawEnv(arrival_times, workflow_templates, cluster_config)
         env.reset()
 
-        # 记录第一步之前的队列长度
-        length_before = env.submit_queue_length
-
         # 执行一步
         server_name, server_id, numa_node_id = valid_strategies[0]
         env_log = env.step(server_name, server_id, numa_node_id, 256)
@@ -439,7 +437,7 @@ class TestRawEnvProperties:
         env = RawEnv(arrival_times, workflow_templates, cluster_config)
         env.reset()
 
-        all_workflow_records = []
+        all_workflow_records: list[WorkflowExecutionRecord] = []
         step_count = 0
 
         while True:
@@ -467,7 +465,7 @@ class TestRawEnvProperties:
         env = RawEnv(arrival_times, workflow_templates, cluster_config)
         env.reset()
 
-        all_workflow_records = []
+        all_workflow_records: list[WorkflowExecutionRecord] = []
         step_count = 0
 
         while True:
