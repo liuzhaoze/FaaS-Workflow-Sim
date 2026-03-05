@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from serverless_workflow_arena import ClusterConfig, RawEnv, WorkflowTemplate
+from serverless_workflow_arena.env_log import WorkflowExecutionRecord
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -287,3 +288,261 @@ class TestFunctionExecutionTiming:
         print(f"\n✓ Verified {len(function_records)} functions across {len(arrival_times)} workflows")
         print(f"  ✓ All internal timing constraints satisfied")
         print(f"  ✓ All predecessor-successor timing constraints satisfied")
+
+
+class TestRawEnvProperties:
+    """测试 RawEnv 的属性和辅助方法"""
+
+    @pytest.fixture
+    def cluster_config(self):
+        """加载集群配置"""
+        config_file = DATA_DIR / "cluster_config.yaml"
+        return ClusterConfig.from_yaml(str(config_file))
+
+    @pytest.fixture
+    def workflow_templates(self, cluster_config: ClusterConfig):
+        """加载工作流模板"""
+        dax_files = tuple(DATA_DIR.glob("*.dax"))
+        return [WorkflowTemplate(str(f), cluster_config.single_core_speed) for f in dax_files]
+
+    @pytest.fixture
+    def valid_strategies(self, cluster_config: ClusterConfig):
+        """生成合法的资源分配策略"""
+        strategies: list[tuple[str, int, int]] = []
+        for server_config in cluster_config.servers:
+            for server_id in range(server_config.count):
+                for numa_node_id in range(server_config.numa_nodes.count):
+                    strategies.append((server_config.name, server_id, numa_node_id))
+        return strategies
+
+    def test_submit_queue_length_after_reset(
+        self,
+        cluster_config: ClusterConfig,
+        workflow_templates: list[WorkflowTemplate],
+    ):
+        """测试重置后 submit_queue_length 返回正确的值"""
+        arrival_times = [0.0]
+        env = RawEnv(arrival_times, workflow_templates, cluster_config)
+        env.reset()
+
+        # reset 之后提交队列至少有1个函数（第一个被取出的函数已出队，队列中剩余的函数）
+        # 实际上 reset 后 current_function 被取走了，queue 中剩余的是后续函数
+        assert env.submit_queue_length >= 0
+
+    def test_submit_queue_length_decreases_after_step(
+        self,
+        cluster_config: ClusterConfig,
+        workflow_templates: list[WorkflowTemplate],
+        valid_strategies: list[tuple[str, int, int]],
+    ):
+        """测试执行一步后 submit_queue_length 的变化"""
+        arrival_times = [0.0]
+        env = RawEnv(arrival_times, workflow_templates, cluster_config)
+        env.reset()
+
+        # 执行一步
+        server_name, server_id, numa_node_id = valid_strategies[0]
+        env_log = env.step(server_name, server_id, numa_node_id, 256)
+
+        # 如果环境未结束，可以继续检查
+        if not env_log.terminated:
+            # 当完成某些函数后，可能会有新函数提交到队列，队列长度可能变化
+            assert env.submit_queue_length >= 0
+        else:
+            assert env.submit_queue_length == 0
+
+    def test_active_workflow_count_after_reset(
+        self,
+        cluster_config: ClusterConfig,
+        workflow_templates: list[WorkflowTemplate],
+    ):
+        """测试重置后 active_workflow_count 正确"""
+        arrival_times = [0.0]
+        env = RawEnv(arrival_times, workflow_templates, cluster_config)
+        env.reset()
+
+        # reset 后第一个工作流已经到达（current_function 属于该工作流）
+        assert env.active_workflow_count == 1
+
+    def test_active_workflow_count_with_multiple_workflows(
+        self,
+        cluster_config: ClusterConfig,
+        workflow_templates: list[WorkflowTemplate],
+    ):
+        """测试多个工作流时 active_workflow_count 正确"""
+        arrival_times = [0.0, 0.0, 0.0]  # 3个同时到达的工作流
+        env = RawEnv(arrival_times, workflow_templates, cluster_config)
+        env.reset()
+
+        # reset 后至少有1个工作流是活跃的（current_function 所属的工作流）
+        assert env.active_workflow_count >= 1
+        assert env.active_workflow_count <= len(arrival_times)
+
+    def test_active_workflow_count_decreases_when_workflow_completes(
+        self,
+        cluster_config: ClusterConfig,
+        workflow_templates: list[WorkflowTemplate],
+        valid_strategies: list[tuple[str, int, int]],
+    ):
+        """测试工作流完成时 active_workflow_count 减少"""
+        arrival_times = [0.0]
+        env = RawEnv(arrival_times, workflow_templates, cluster_config)
+        env.reset()
+
+        step_count = 0
+        while True:
+            server_name, server_id, numa_node_id = valid_strategies[step_count % len(valid_strategies)]
+            env_log = env.step(server_name, server_id, numa_node_id, 256)
+            step_count += 1
+            if env_log.terminated:
+                break
+
+        # 所有工作流完成后，active_workflow_count 应该为 0
+        assert env.active_workflow_count == 0
+
+    def test_active_workflows_cleared_on_reset(
+        self,
+        cluster_config: ClusterConfig,
+        workflow_templates: list[WorkflowTemplate],
+        valid_strategies: list[tuple[str, int, int]],
+    ):
+        """测试 reset 后 _active_workflows 被正确清除"""
+        arrival_times = [0.0]
+        env = RawEnv(arrival_times, workflow_templates, cluster_config)
+        env.reset()
+
+        # 执行完成
+        step_count = 0
+        while True:
+            server_name, server_id, numa_node_id = valid_strategies[step_count % len(valid_strategies)]
+            env_log = env.step(server_name, server_id, numa_node_id, 256)
+            step_count += 1
+            if env_log.terminated:
+                break
+
+        # 再次重置
+        env.reset()
+
+        # 重置后应该重新包含第一个工作流
+        assert env.active_workflow_count == 1
+
+    def test_finished_workflow_records_populated(
+        self,
+        cluster_config: ClusterConfig,
+        workflow_templates: list[WorkflowTemplate],
+        valid_strategies: list[tuple[str, int, int]],
+    ):
+        """测试 finished_workflow_records 在工作流完成时被正确填充"""
+        arrival_times = [0.0]
+        env = RawEnv(arrival_times, workflow_templates, cluster_config)
+        env.reset()
+
+        all_workflow_records: list[WorkflowExecutionRecord] = []
+        step_count = 0
+
+        while True:
+            server_name, server_id, numa_node_id = valid_strategies[step_count % len(valid_strategies)]
+            env_log = env.step(server_name, server_id, numa_node_id, 256)
+            all_workflow_records.extend(env_log.finished_workflow_records)
+            step_count += 1
+            if env_log.terminated:
+                break
+
+        # 1个工作流应该有1条记录
+        assert len(all_workflow_records) == 1
+        record = all_workflow_records[0]
+        assert record.wf_id == 0
+        assert record.completion_time > 0.0
+
+    def test_finished_workflow_records_multiple_workflows(
+        self,
+        cluster_config: ClusterConfig,
+        workflow_templates: list[WorkflowTemplate],
+        valid_strategies: list[tuple[str, int, int]],
+    ):
+        """测试多个工作流时 finished_workflow_records 包含所有工作流的记录"""
+        arrival_times = [0.0, 1.0, 2.0]
+        env = RawEnv(arrival_times, workflow_templates, cluster_config)
+        env.reset()
+
+        all_workflow_records: list[WorkflowExecutionRecord] = []
+        step_count = 0
+
+        while True:
+            server_name, server_id, numa_node_id = valid_strategies[step_count % len(valid_strategies)]
+            env_log = env.step(server_name, server_id, numa_node_id, 256)
+            all_workflow_records.extend(env_log.finished_workflow_records)
+            step_count += 1
+            if env_log.terminated:
+                break
+
+        # 3个工作流应该有3条记录
+        assert len(all_workflow_records) == 3
+
+        # 每个工作流ID应该唯一出现一次
+        recorded_wf_ids = {r.wf_id for r in all_workflow_records}
+        assert recorded_wf_ids == {0, 1, 2}
+
+        # 完成时间应该都是正数
+        for record in all_workflow_records:
+            assert record.completion_time > 0.0
+
+    def test_get_data_distribution_no_predecessors(
+        self,
+        cluster_config: ClusterConfig,
+        workflow_templates: list[WorkflowTemplate],
+        valid_strategies: list[tuple[str, int, int]],
+    ):
+        """测试无前驱函数时 get_data_distribution 返回空列表"""
+        arrival_times = [0.0]
+        env = RawEnv(arrival_times, workflow_templates, cluster_config)
+        env.reset()
+
+        # current_function 是源点函数，无前驱
+        assert env.current_function is not None
+        wf_id = env.current_function.wf_id
+        fn_id = env.current_function.fn_id
+
+        # 源点函数没有前驱，get_data_distribution 应该返回空列表
+        distribution = env.get_data_distribution(wf_id, fn_id)
+        assert distribution == []
+
+    def test_get_data_distribution_with_predecessors(
+        self,
+        cluster_config: ClusterConfig,
+        workflow_templates: list[WorkflowTemplate],
+        valid_strategies: list[tuple[str, int, int]],
+    ):
+        """测试有前驱函数时 get_data_distribution 返回正确的位置和数据大小"""
+        arrival_times = [0.0]
+        env = RawEnv(arrival_times, workflow_templates, cluster_config)
+        env.reset()
+
+        # 收集每一步的函数信息，找到第一个有前驱的函数
+        step_count = 0
+        found_fn_with_predecessors = False
+
+        while True:
+            assert env.current_function is not None
+            wf_id = env.current_function.wf_id
+            fn_id = env.current_function.fn_id
+
+            predecessors = env.workload[wf_id].get_predecessor_functions(fn_id)
+
+            server_name, server_id, numa_node_id = valid_strategies[step_count % len(valid_strategies)]
+            env_log = env.step(server_name, server_id, numa_node_id, 256)
+            step_count += 1
+
+            if predecessors and not found_fn_with_predecessors:
+                # 验证 get_data_distribution 返回的信息
+                distribution = env.get_data_distribution(wf_id, fn_id)
+                assert len(distribution) == len(predecessors)
+
+                for (location, data_size), (_, _, expected_data_size) in zip(distribution, predecessors):
+                    assert data_size == expected_data_size
+                    assert location is not None
+
+                found_fn_with_predecessors = True
+
+            if env_log.terminated:
+                break

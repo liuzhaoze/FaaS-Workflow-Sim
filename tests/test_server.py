@@ -1018,3 +1018,123 @@ class TestServerIntegration:
         # 验证没有容器了
         assert server.earliest_finished_nn_id is None
         assert server.latest_finished_nn_id is None
+
+
+class TestServerGetStatusAt:
+    """测试 Server 类的 get_status_at 方法"""
+
+    @pytest.fixture
+    def server(self) -> Server:
+        """创建示例服务器（2个NUMA节点）"""
+        s = Server(
+            server_id=0,
+            hourly_rate=1.5,
+            cold_start_latency=5.0,
+            numa_node_count=2,
+            numa_node_cpu=4,
+            numa_node_memory=8192,
+            single_core_speed=1000,
+        )
+        s.reset()
+        return s
+
+    def test_get_status_at_not_started(self, server: Server):
+        """测试未启动服务器（无容器）的状态"""
+        status = server.get_status_at(0.0)
+
+        assert status.remaining_lease_time == 0.0
+        assert status.time_to_first_completion == 0.0
+        assert status.time_to_last_completion == 0.0
+        assert len(status.numa_node_statuses) == 2
+
+    def test_get_status_at_remaining_lease_time(self, server: Server):
+        """测试租期内和租期外的 remaining_lease_time"""
+        # 手动设置到期时间
+        server.expiration_time = 100.0
+
+        # 在租期内查询
+        status_in_lease = server.get_status_at(50.0)
+        assert status_in_lease.remaining_lease_time == pytest.approx(50.0, rel=1e-9)  # type: ignore
+
+        # 在租期外查询
+        status_after_lease = server.get_status_at(150.0)
+        assert status_after_lease.remaining_lease_time == 0.0
+
+    def test_get_status_at_with_running_containers(self, server: Server):
+        """测试有运行中容器时的服务器状态"""
+        # 启动服务器
+        server.startup_at(0.0)
+
+        # 在 NUMA 节点0上创建容器：completion_time = 2.0
+        c1 = Container(
+            wf_id=0,
+            fn_id=0,
+            memory_req=512,
+            memory_alloc=512,
+            computation=2000,
+            parallelism=1,
+            submission_time=5.0,  # 冷启动后的时间
+            data_transfer_time=0.0,
+        )
+        server.on_container_creation(numa_node_id=0, c=c1)
+
+        # 在 NUMA 节点1上创建容器：completion_time = 4.0
+        c2 = Container(
+            wf_id=0,
+            fn_id=1,
+            memory_req=512,
+            memory_alloc=512,
+            computation=4000,
+            parallelism=1,
+            submission_time=5.0,
+            data_transfer_time=0.0,
+        )
+        server.on_container_creation(numa_node_id=1, c=c2)
+
+        # 在容器创建之后的某个时间点查询状态
+        status = server.get_status_at(5.0)
+
+        # time_to_first_completion 应该对应最早完成的容器（c1，2秒后完成）
+        assert status.time_to_first_completion == pytest.approx(2.0, rel=1e-9)  # type: ignore
+        # time_to_last_completion 应该对应最晚完成的容器（c2，4秒后完成）
+        assert status.time_to_last_completion == pytest.approx(4.0, rel=1e-9)  # type: ignore
+        # 有2个NUMA节点
+        assert len(status.numa_node_statuses) == 2
+
+    def test_get_status_at_numa_node_statuses(self, server: Server):
+        """测试 numa_node_statuses 包含所有 NUMA 节点的状态"""
+        status = server.get_status_at(0.0)
+
+        # 每个 NumaNodeStatus 应该有正确的字段
+        for nn_status in status.numa_node_statuses:
+            assert nn_status.cpu >= 0.0
+            assert nn_status.memory >= 0.0
+            assert nn_status.load >= 0.0
+            assert nn_status.total_parallelism >= 0
+            assert nn_status.free_memory >= 0
+
+    def test_get_status_at_time_to_completion_after_all_done(self, server: Server):
+        """测试所有容器完成后 time_to_*_completion 为 0"""
+        # 创建并完成一个容器
+        server.startup_at(0.0)
+        c = Container(
+            wf_id=0,
+            fn_id=0,
+            memory_req=512,
+            memory_alloc=512,
+            computation=1000,
+            parallelism=1,
+            submission_time=5.0,
+            data_transfer_time=0.0,
+        )
+        server.on_container_creation(numa_node_id=0, c=c)
+        server.on_container_completion()
+
+        # 容器完成后，earliest/latest_finished_nn_id 应为 None
+        assert server.earliest_finished_nn_id is None
+        assert server.latest_finished_nn_id is None
+
+        # 查询状态
+        status = server.get_status_at(100.0)
+        assert status.time_to_first_completion == 0.0
+        assert status.time_to_last_completion == 0.0
